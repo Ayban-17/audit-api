@@ -132,79 +132,155 @@ function checkHasDescription($linkElement, sectionType) {
   let hasDescription = false;
   let descriptionContent = '';
   let descriptionElementFound = false;
+  let descriptionSource = '';
   
-  switch (sectionType) {
-    case 'four':
-    case 'sumtiles':
-      // Check .al-lnk-details
-      const fourDetails = $link.find('.al-lnk-details');
-      if (fourDetails.length > 0) {
+  // Primary description selectors based on known patterns
+  const primarySelectors = [
+    '.al-lnk-details',           // Standard link details
+    '.al-lp-table-summary'       // Table summaries (main target)
+  ];
+  
+  // Secondary fallback selectors
+  const fallbackSelectors = [
+    '.al-lnk-summary',           // Link summaries
+    '.al-content',               // General content
+    '.al-desc',                  // Description class
+    '.description',              // Generic description
+    'p'                          // Paragraph tags
+  ];
+  
+  // STEP 1: Check directly within the link element
+  for (const selector of primarySelectors) {
+    const element = $link.find(selector);
+    if (element.length > 0) {
+      const content = extractTextContent(element.html());
+      if (content && content.length > 10) {
         descriptionElementFound = true;
-        descriptionContent = extractTextContent(fourDetails.html());
-        hasDescription = descriptionContent.length > 0;
+        descriptionContent = content;
+        descriptionSource = `link->${selector}`;
+        hasDescription = true;
+        break;
       }
-      break;
-      
-    case 'table':
-      // Check .al-lp-table-summary
-      const tableSummary = $link.find('.al-lp-table-summary');
-      if (tableSummary.length > 0) {
-        descriptionElementFound = true;
-        descriptionContent = extractTextContent(tableSummary.html());
-        hasDescription = descriptionContent.length > 0;
-      }
-      break;
-      
-    case 'articles':
-      // Only check if parent div has title attribute
-      const parentDiv = $link.closest('div[title]');
-      const parentDivHasTitle = parentDiv.length > 0;
-      const titleAttributeValue = parentDiv.attr('title') || '';
-      
-      if (parentDivHasTitle) {
-        const articleDetails = $link.find('.al-lnk-details');
-        if (articleDetails.length > 0) {
+    }
+  }
+  
+  // STEP 2: For table structures, check the parent row for .al-lp-table-summary
+  if (!hasDescription && (sectionType === 'table' || sectionType === 'unknown')) {
+    const $row = $link.closest('tr');
+    if ($row.length > 0) {
+      const summaryCell = $row.find('.al-lp-table-summary');
+      if (summaryCell.length > 0) {
+        const content = extractTextContent(summaryCell.html());
+        if (content && content.length > 10) {
           descriptionElementFound = true;
-          descriptionContent = extractTextContent(articleDetails.html());
-          hasDescription = descriptionContent.length > 0;
+          descriptionContent = content;
+          descriptionSource = 'table-row->.al-lp-table-summary';
+          hasDescription = true;
+        }
+      }
+    }
+  }
+  
+  // STEP 3: Check parent containers (various card/item wrappers)
+  if (!hasDescription) {
+    const containers = [
+      $link.closest('.al-lnk'),
+      $link.closest('.al-item'), 
+      $link.closest('.al-card'),
+      $link.closest('.al-tile'),
+      $link.closest('div[class*="al-"]'),  // Any div with al- class
+      $link.closest('td'),                 // Table cell
+      $link.closest('.al-lp-table')        // Table container
+    ];
+    
+    for (const $container of containers) {
+      if ($container.length > 0) {
+        for (const selector of primarySelectors) {
+          const element = $container.find(selector);
+          if (element.length > 0) {
+            const content = extractTextContent(element.html());
+            if (content && content.length > 10) {
+              descriptionElementFound = true;
+              descriptionContent = content;
+              descriptionSource = `container(${$container.prop('tagName').toLowerCase()})->${selector}`;
+              hasDescription = true;
+              break;
+            }
+          }
+        }
+        if (hasDescription) break;
+      }
+    }
+  }
+  
+  // STEP 4: Fallback selectors if still no description found
+  if (!hasDescription) {
+    for (const selector of fallbackSelectors) {
+      // Try in link first
+      let element = $link.find(selector);
+      if (element.length > 0) {
+        const content = extractTextContent(element.html());
+        if (content && content.length > 10) {
+          descriptionElementFound = true;
+          descriptionContent = content;
+          descriptionSource = `fallback-link->${selector}`;
+          hasDescription = true;
+          break;
         }
       }
       
+      // Try in closest container
+      const $container = $link.closest('.al-lnk, .al-item, .al-card, tr, td');
+      if ($container.length > 0) {
+        element = $container.find(selector);
+        if (element.length > 0) {
+          const content = extractTextContent(element.html());
+          if (content && content.length > 10) {
+            descriptionElementFound = true;
+            descriptionContent = content;
+            descriptionSource = `fallback-container->${selector}`;
+            hasDescription = true;
+            break;
+          }
+        }
+      }
+    }
+  }
+  
+  // Special handling for articles section
+  if (sectionType === 'articles') {
+    const parentDiv = $link.closest('div[title]');
+    const parentDivHasTitle = parentDiv.length > 0;
+    const titleAttributeValue = parentDiv.attr('title') || '';
+    
+    if (!parentDivHasTitle) {
       return {
-        hasDescription,
-        reason: parentDivHasTitle ? 'checked' : 'parent_no_title',
+        hasDescription: false,
+        reason: 'parent_no_title',
         debugInfo: {
           isInSectionTitle,
           isButtonLink,
           parentDivHasTitle,
           titleAttributeValue,
           descriptionElementFound,
-          descriptionContent: descriptionContent.substring(0, 100)
+          descriptionContent: descriptionContent.substring(0, 100),
+          descriptionSource
         }
       };
-      
-    default:
-      // Other sections show as not applicable
-      return {
-        hasDescription: false,
-        reason: 'not_applicable',
-        debugInfo: {
-          isInSectionTitle,
-          isButtonLink,
-          sectionType
-        }
-      };
+    }
   }
   
   return {
     hasDescription,
-    reason: 'checked',
+    reason: hasDescription ? 'found' : 'not_found',
     debugInfo: {
       isInSectionTitle,
       isButtonLink,
       descriptionElementFound,
       descriptionContent: descriptionContent.substring(0, 100),
-      sectionType
+      descriptionSource,
+      sectionType,
+      searchSteps: 'link->table-row->containers->fallbacks'
     }
   };
 }
