@@ -1,0 +1,2090 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Link Audit Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        .api-config {
+            background: rgba(255,255,255,0.1);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .input-group input {
+            flex: 1;
+            padding: 12px 15px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            min-width: 300px;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            box-shadow: 0 0 10px rgba(255,255,255,0.3);
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #2196F3;
+            color: white;
+            margin-left: 10px;
+        }
+
+        .btn-secondary:hover {
+            background: #1976D2;
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #ff6b6b;
+            color: white;
+            padding: 1rem;
+            border-radius: 5px;
+            margin: 1rem 0;
+        }
+
+        .success {
+            background: #4CAF50;
+            color: white;
+            padding: 1rem;
+            border-radius: 5px;
+            margin: 1rem 0;
+        }
+
+        .tabs {
+            display: flex;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 1rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab-btn.active {
+            background: #667eea;
+            color: white;
+            border-bottom-color: #4f5fd8;
+        }
+
+        .tab-btn:hover:not(.active) {
+            background: #f0f0f0;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-container {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .chart-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            text-align: center;
+            color: #333;
+        }
+
+        .table-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+            margin-bottom: 2rem;
+        }
+
+        .table-header {
+            background: #667eea;
+            color: white;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .table-filters {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .table-filters select,
+        .table-filters input {
+            padding: 8px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        tr:hover {
+            background: #f5f5f5;
+        }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-available {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-unavailable {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-valid {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .status-invalid {
+            background: #f5c6cb;
+            color: #721c24;
+        }
+
+        .status-unknown {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
+        .status-wrong-path {
+            background: #f5c6cb;
+            color: #721c24;
+        }
+
+        .status-external {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .url-link {
+            color: #667eea;
+            text-decoration: none;
+            word-break: break-all;
+        }
+
+        .url-link:hover {
+            text-decoration: underline;
+        }
+
+        .export-section {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .export-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+
+        .category-badge {
+            background: #e9ecef;
+            color: #495057;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .input-group {
+                flex-direction: column;
+            }
+
+            .input-group input {
+                min-width: auto;
+            }
+
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            }
+
+            .tabs {
+                flex-direction: column;
+            }
+
+            .table-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+
+        .sub-tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 4px;
+            gap: 4px;
+        }
+
+        .sub-tab-btn {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border-radius: 6px;
+            color: #666;
+        }
+
+        .sub-tab-btn.active {
+            background: #667eea;
+            color: white;
+            box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+        }
+
+        .sub-tab-btn:hover:not(.active) {
+            background: #e9ecef;
+            color: #333;
+        }
+
+        .sub-tab-content {
+            display: block;
+        }
+
+        .sub-tab-content.hidden {
+            display: none;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .insight-item {
+            margin-bottom: 1.5rem;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .insight-header {
+            padding: 1rem;
+            border-bottom: 1px solid;
+        }
+
+        .insight-content {
+            padding: 1rem;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .insight-link-item {
+            margin: 0.5rem 0;
+            padding: 0.5rem;
+            background: rgba(255,255,255,0.7);
+            border-radius: 4px;
+            border-left: 2px solid;
+            transition: background-color 0.2s ease;
+        }
+
+        .insight-link-item:hover {
+            background: rgba(255,255,255,0.9);
+        }
+
+        .link-text {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.2rem;
+        }
+
+        .link-url {
+            font-size: 12px;
+            color: #666;
+            font-family: monospace;
+            word-break: break-all;
+            margin-bottom: 0.2rem;
+        }
+
+        .link-error {
+            font-size: 12px;
+            color: #d32f2f;
+            font-style: italic;
+        }
+
+        .category-tag {
+            font-size: 11px;
+            background: #e0e0e0;
+            padding: 1px 4px;
+            border-radius: 2px;
+            margin-left: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header Section -->
+        <div class="header">
+            <h1>🔍 Link Audit Dashboard</h1>
+            
+            <div class="api-config">
+                <label for="apiEndpoint">API Endpoint:</label>
+                <div class="input-group">
+                    <input type="text" id="apiEndpoint" value="http://localhost:3000/routes/audit_script" placeholder="API Endpoint URL">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <input type="url" id="urlInput" placeholder="Enter URL to audit (e.g., https://www.adventure-life.com/galapagos)" value="https://www.adventure-life.com/galapagos">
+                <button class="btn btn-primary" id="analyzeBtn">🚀 Analyze Links</button>
+                <button class="btn btn-secondary" id="clearBtn">🗑️ Clear Results</button>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="loading hidden">
+            <div class="spinner"></div>
+            <h3>Analyzing links...</h3>
+            <p>This may take a few moments depending on the number of links found.</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="errorState" class="error hidden"></div>
+
+        <!-- Results Section -->
+        <div id="resultsSection" class="hidden">
+            
+            <!-- Navigation Tabs -->
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="summary">📊 Summary</button>
+                <button class="tab-btn" data-tab="charts">📈 Charts</button>
+                <button class="tab-btn" data-tab="details">📋 Details</button>
+                <button class="tab-btn" data-tab="export">💾 Export</button>
+            </div>
+
+            <!-- Summary Tab -->
+            <div id="summaryTab" class="tab-content active">
+                <div class="stats-grid" id="statsGrid">
+                    <!-- Stats will be populated here -->
+                </div>
+                
+                <!-- Quick Insights Panel -->
+                <div class="table-container" id="insightsPanel" style="display: none;">
+                    <div class="table-header">
+                        <h3>🚨 Detailed Issues & Errors Found</h3>
+                        <small style="color: rgba(255,255,255,0.8);">All problematic links with specific error details</small>
+                    </div>
+                    <div style="padding: 1rem;">
+                        <div id="insightsContent">
+                            <!-- Insights will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Tab -->
+            <div id="chartsTab" class="tab-content">
+                <div class="charts-grid">
+                    <div class="chart-container">
+                        <h3 class="chart-title">Links by Category</h3>
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3 class="chart-title">Availability Status</h3>
+                        <canvas id="availabilityChart"></canvas>
+                    </div>
+                </div>
+                <div class="charts-grid">
+                    <div class="chart-container">
+                        <h3 class="chart-title">Validation Results</h3>
+                        <canvas id="validationChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3 class="chart-title">Link Sources</h3>
+                        <canvas id="sourceChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Details Tab -->
+            <div id="detailsTab" class="tab-content">
+                <!-- Sub-tabs for different views -->
+                <div class="sub-tabs" style="margin-bottom: 1rem;">
+                    <button class="sub-tab-btn active" data-subtab="section">📍 By Section</button>
+                    <button class="sub-tab-btn" data-subtab="urlpattern">🔗 By URL Pattern</button>
+                </div>
+
+                <!-- Sub-tab contents -->
+                <div id="sectionView" class="sub-tab-content active">
+                    <!-- Section-based tables will be populated here -->
+                </div>
+
+                <div id="urlpatternView" class="sub-tab-content hidden">
+                    <!-- URL pattern-based tables will be populated here -->
+                </div>
+            </div>
+
+            <!-- Export Tab -->
+            <div id="exportTab" class="tab-content">
+                <div class="export-section">
+                    <h3>📥 Export Data</h3>
+                    <p>Download your analysis results in various formats:</p>
+                    <div class="export-buttons">
+                        <button class="btn btn-primary" id="exportJsonBtn">📄 Export JSON</button>
+                        <button class="btn btn-primary" id="exportCsvBtn">📊 Export CSV</button>
+                        <button class="btn btn-secondary" id="printReportBtn">🖨️ Print Report</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class LinkAuditDashboard {
+            constructor() {
+                this.data = null;
+                this.charts = {};
+                this.auditUrl = '';
+                this.initializeEventListeners();
+            }
+
+            initializeEventListeners() {
+                // Tab navigation
+                document.querySelectorAll('.tab-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => this.switchTab(e.target.dataset.tab));
+                });
+
+                // Sub-tab navigation
+                document.querySelectorAll('.sub-tab-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => this.switchSubTab(e.target.dataset.subtab));
+                });
+
+                // Main buttons
+                document.getElementById('analyzeBtn').addEventListener('click', () => this.analyzeUrl());
+                document.getElementById('clearBtn').addEventListener('click', () => this.clearResults());
+                
+                // Export buttons
+                document.getElementById('exportJsonBtn').addEventListener('click', () => this.exportJson());
+                document.getElementById('exportCsvBtn').addEventListener('click', () => this.exportCsv());
+                document.getElementById('printReportBtn').addEventListener('click', () => this.printReport());
+
+                // Enter key on URL input
+                document.getElementById('urlInput').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.analyzeUrl();
+                });
+            }
+
+            // NEW: Extract destination from audit URL (last meaningful segment)
+            extractDestinationFromUrl(url) {
+                try {
+                    const urlObj = new URL(url);
+                    const pathSegments = urlObj.pathname
+                        .split('/')
+                        .filter(segment => segment.length > 0)
+                        .filter(segment => !['tours', 'cruises', 'hotels', 'articles', 'stories', 'deals', 'info'].includes(segment.toLowerCase()));
+                    
+                    if (pathSegments.length === 0) return 'this destination';
+                    
+                    // Get the last meaningful segment and capitalize it
+                    const lastSegment = pathSegments[pathSegments.length - 1];
+                    return lastSegment.charAt(0).toUpperCase() + lastSegment.slice(1).replace(/-/g, ' ');
+                } catch (error) {
+                    return 'this destination';
+                }
+            }
+
+            // NEW: Convert technical errors to user-friendly messages
+            convertToUserFriendlyError(error, urlPattern, destination, linkText) {
+                if (!error) return '';
+
+                const errorLower = error.toLowerCase();
+                
+                // Handle HTTP status codes
+                if (errorLower.includes('404') || errorLower.includes('not found')) {
+                    return 'Page not found or no longer available';
+                }
+                
+                if (errorLower.includes('500') || errorLower.includes('502') || errorLower.includes('503') || errorLower.includes('504')) {
+                    return 'Website temporarily unavailable';
+                }
+                
+                if (errorLower.includes('timeout') || errorLower.includes('took too long')) {
+                    return 'Page took too long to load';
+                }
+                
+                if (errorLower.includes('network') || errorLower.includes('connection') || errorLower.includes('connect')) {
+                    return 'Unable to connect to this page';
+                }
+                
+                if (errorLower.includes('no price') || errorLower.includes('price not found')) {
+                    return 'Pricing information not available';
+                }
+                
+                if (errorLower.includes('validation failed') || errorLower.includes('cannot be accessed')) {
+                    return 'Page cannot be accessed';
+                }
+                
+                if (errorLower.includes('redirect')) {
+                    return 'Page has moved to a different location';
+                }
+
+                if (errorLower.includes('wrong path') || errorLower.includes('contactt')) {
+                    return 'Incorrect website address - may have typing error';
+                }
+
+                // Return original error if no pattern matches, but make it more user-friendly
+                return error.charAt(0).toUpperCase() + error.slice(1);
+            }
+
+            // NEW: Get unavailable message based on URL pattern
+            getUnavailableMessage(urlPattern, destination, linkText) {
+                switch (urlPattern) {
+                    case 'cruise-ship':
+                        return `This cruise ship is no longer available for ${destination} tours`;
+                    
+                    case 'tour-with-id':
+                        return `This tour is currently unavailable in ${destination}`;
+                    
+                    case 'tour-activity':
+                        return `This activity is not offered in ${destination} anymore`;
+                    
+                    case 'cruise-with-id':
+                        return `This cruise is no longer available in ${destination}`;
+                    
+                    case 'destination-special-page':
+                        return `This ${destination} page is currently unavailable`;
+                    
+                    case 'multi-level/stories/story-name':
+                    case 'multi-level/articles/article-name':
+                        return 'This content is no longer available';
+                    
+                    case 'contact-page':
+                        return 'Contact page is currently unavailable';
+                    
+                    case 'wrong-contact-path':
+                        return 'Incorrect contact page address - may have typing error';
+                    
+                    case 'external-link':
+                        return 'External website is currently unavailable';
+                    
+                    default:
+                        if (urlPattern && urlPattern.startsWith('multi-level/destination-')) {
+                            return `This ${destination} page is currently unavailable`;
+                        }
+                        return 'This page is currently unavailable';
+                }
+            }
+
+            // NEW: Get user-friendly reason for link status
+            getUserFriendlyReason(link, destination) {
+                let reasonText = '';
+                
+                // Handle available/unavailable status
+                if (link.available !== undefined) {
+                    if (link.available) {
+                        // Available - show positive reasons
+                        if (link.price) {
+                            reasonText = `Available - Pricing: ${link.price} ${link.currency || ''}`;
+                        } else if (link.shipOptions && link.shipOptions.length > 0) {
+                            reasonText = `Available - ${link.shipOptions.length} cruise ships available`;
+                        } else if (link.experienceOptions && link.experienceOptions.length > 0) {
+                            reasonText = `Available - ${link.experienceOptions.length} experiences available`;
+                        } else if (link.pageType === 'landing') {
+                            reasonText = 'Available - Direct activity page accessible';
+                        } else {
+                            reasonText = 'Available - Page accessible and content found';
+                        }
+                    } else {
+                        // Unavailable - use pattern-specific messages
+                        const unavailableMsg = this.getUnavailableMessage(link.category, destination, link.text);
+                        
+                        // Add specific error if available
+                        if (link.availabilityError || link.error) {
+                            const specificError = this.convertToUserFriendlyError(
+                                link.availabilityError || link.error, 
+                                link.category, 
+                                destination, 
+                                link.text
+                            );
+                            reasonText = `${unavailableMsg} - ${specificError}`;
+                        } else {
+                            reasonText = unavailableMsg;
+                        }
+                    }
+                } 
+                // Handle valid/invalid status for non-availability checks
+                else if (link.valid !== undefined) {
+                    if (link.valid) {
+                        reasonText = link.status ? 
+                            `Page accessible - Status: ${link.status}` : 
+                            'Page accessible and working correctly';
+                    } else {
+                        // Invalid - get user-friendly error
+                        if (link.validationError) {
+                            reasonText = this.convertToUserFriendlyError(
+                                link.validationError, 
+                                link.category, 
+                                destination, 
+                                link.text
+                            );
+                        } else if (link.status) {
+                            reasonText = this.convertToUserFriendlyError(
+                                `HTTP ${link.status}`, 
+                                link.category, 
+                                destination, 
+                                link.text
+                            );
+                        } else {
+                            reasonText = 'Page cannot be accessed';
+                        }
+                    }
+                } else {
+                    reasonText = 'Not tested or data unavailable';
+                }
+                
+                return reasonText;
+            }
+
+            switchSubTab(subTabName) {
+                // Update sub-tab buttons
+                document.querySelectorAll('.sub-tab-btn').forEach(btn => btn.classList.remove('active'));
+                document.querySelector(`[data-subtab="${subTabName}"]`).classList.add('active');
+
+                // Update sub-tab content
+                document.querySelectorAll('.sub-tab-content').forEach(content => content.classList.add('hidden'));
+                document.getElementById(`${subTabName}View`).classList.remove('hidden');
+
+                // Render the appropriate view if data exists
+                if (this.data) {
+                    this.renderDetailView(subTabName);
+                }
+            }
+
+            switchTab(tabName) {
+                // Update tab buttons
+                document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+                document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+
+                // Update tab content
+                document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                document.getElementById(`${tabName}Tab`).classList.add('active');
+            }
+
+            async analyzeUrl() {
+                const url = document.getElementById('urlInput').value.trim();
+                const apiEndpoint = document.getElementById('apiEndpoint').value.trim();
+
+                if (!url) {
+                    this.showError('Please enter a URL to analyze');
+                    return;
+                }
+
+                if (!apiEndpoint) {
+                    this.showError('Please enter an API endpoint');
+                    return;
+                }
+
+                // Store audit URL for destination extraction
+                this.auditUrl = url;
+
+                this.showLoading(true);
+                this.clearError();
+
+                try {
+                    const response = await fetch(apiEndpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ url })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    this.data = await response.json();
+                    this.showResults();
+                    this.showSuccess('Analysis completed successfully!');
+
+                } catch (error) {
+                    console.error('API Error:', error);
+                    this.showError(`Failed to analyze URL: ${error.message}`);
+                } finally {
+                    this.showLoading(false);
+                }
+            }
+
+            showResults() {
+                this.renderSummary();
+                this.renderInsights();
+                this.renderCharts();
+                this.renderDetailTables();
+                
+                document.getElementById('resultsSection').classList.remove('hidden');
+            }
+
+            renderSummary() {
+                const stats = this.data.stats;
+                const statsGrid = document.getElementById('statsGrid');
+
+                const summaryStats = [
+                    { label: 'Total Links', value: stats.totalLinks, color: '#667eea' },
+                    { label: 'Intro Links', value: stats.totalIntroLinks, color: '#4CAF50' },
+                    { label: 'Main Links', value: stats.totalMainLinks, color: '#2196F3' },
+                    { label: 'Categories', value: Object.keys(stats.categoryCounts).length, color: '#FF9800' },
+                ];
+
+                // Calculate total available/unavailable across all categories
+                let totalAvailable = 0;
+                let totalUnavailable = 0;
+                let totalValid = 0;
+                let totalInvalid = 0;
+                let totalWrongPaths = 0;
+
+                if (stats.cruiseAvailability) {
+                    totalAvailable += stats.cruiseAvailability.available || 0;
+                    totalUnavailable += stats.cruiseAvailability.unavailable || 0;
+                }
+
+                if (stats.tourActivityValidation) {
+                    totalAvailable += stats.tourActivityValidation.available || 0;
+                    totalUnavailable += stats.tourActivityValidation.unavailable || 0;
+                    totalValid += stats.tourActivityValidation.valid || 0;
+                    totalInvalid += stats.tourActivityValidation.invalid || 0;
+                }
+
+                if (stats.cruiseShipValidation) {
+                    totalAvailable += stats.cruiseShipValidation.available || 0;
+                    totalUnavailable += stats.cruiseShipValidation.unavailable || 0;
+                    totalValid += stats.cruiseShipValidation.valid || 0;
+                    totalInvalid += stats.cruiseShipValidation.invalid || 0;
+                }
+
+                if (stats.destinationValidation) {
+                    totalValid += stats.destinationValidation.valid || 0;
+                    totalInvalid += stats.destinationValidation.invalid || 0;
+                }
+
+                if (stats.storyValidation) {
+                    totalAvailable += stats.storyValidation.available || 0;
+                    totalUnavailable += stats.storyValidation.unavailable || 0;
+                    totalValid += stats.storyValidation.valid || 0;
+                    totalInvalid += stats.storyValidation.invalid || 0;
+                }
+
+                if (stats.contactPageValidation) {
+                    totalAvailable += stats.contactPageValidation.available || 0;
+                    totalUnavailable += stats.contactPageValidation.unavailable || 0;
+                    totalValid += stats.contactPageValidation.valid || 0;
+                    totalInvalid += stats.contactPageValidation.invalid || 0;
+                }
+
+                if (stats.externalLinkValidation) {
+                    totalAvailable += stats.externalLinkValidation.available || 0;
+                    totalUnavailable += stats.externalLinkValidation.unavailable || 0;
+                    totalValid += stats.externalLinkValidation.valid || 0;
+                    totalInvalid += stats.externalLinkValidation.invalid || 0;
+                }
+
+                if (stats.wrongContactPathValidation) {
+                    totalWrongPaths = stats.wrongContactPathValidation.total || 0;
+                    totalInvalid += totalWrongPaths; // Wrong paths are invalid
+                }
+
+                // Add availability summary
+                if (totalAvailable > 0 || totalUnavailable > 0) {
+                    summaryStats.push(
+                        { label: 'Available Links', value: totalAvailable, color: '#4CAF50' },
+                        { label: 'Unavailable Links', value: totalUnavailable, color: '#f44336' }
+                    );
+                }
+
+                // Add validation summary
+                if (totalValid > 0 || totalInvalid > 0) {
+                    summaryStats.push(
+                        { label: 'Valid Links', value: totalValid, color: '#4CAF50' },
+                        { label: 'Invalid Links', value: totalInvalid, color: '#f44336' }
+                    );
+                }
+
+                // Add wrong paths if any
+                if (totalWrongPaths > 0) {
+                    summaryStats.push(
+                        { label: 'Wrong Paths', value: totalWrongPaths, color: '#9C27B0' }
+                    );
+                }
+
+                // Add specific category stats if available
+                if (stats.cruiseAvailability && stats.cruiseAvailability.total > 0) {
+                    summaryStats.push(
+                        { label: 'Total Cruises', value: stats.cruiseAvailability.total, color: '#00BCD4' }
+                    );
+                }
+
+                if (stats.cruiseShipValidation && stats.cruiseShipValidation.total > 0) {
+                    summaryStats.push(
+                        { label: 'Cruise Ships', value: stats.cruiseShipValidation.total, color: '#3F51B5' }
+                    );
+                }
+
+                if (stats.externalLinkValidation && stats.externalLinkValidation.total > 0) {
+                    summaryStats.push(
+                        { label: 'External Links', value: stats.externalLinkValidation.total, color: '#795548' }
+                    );
+                }
+
+                statsGrid.innerHTML = summaryStats.map(stat => `
+                    <div class="stat-card">
+                        <div class="stat-value" style="color: ${stat.color}">${stat.value}</div>
+                        <div class="stat-label">${stat.label}</div>
+                    </div>
+                `).join('');
+            }
+
+            renderInsights() {
+                const stats = this.data.stats;
+                const detailedResults = this.data.detailedResults;
+                const insights = [];
+                const destination = this.extractDestinationFromUrl(this.auditUrl);
+
+                // Collect all problematic links with details
+                const problemLinks = {
+                    unavailable: [],
+                    invalid: [],
+                    wrongPaths: [],
+                    redirected: [],
+                    errors: [],
+                    lackingVariation: []
+                };
+
+                // Check for sections with excessive duplicate titles
+                if (detailedResults && detailedResults.sectionBreakdown) {
+                    detailedResults.sectionBreakdown.forEach(section => {
+                        if (section.titleGroups && section.titleGroups.length > 0) {
+                            const titleCounts = {};
+                            section.titleGroups.forEach(titleGroup => {
+                                const title = titleGroup.title;
+                                titleCounts[title] = (titleCounts[title] || 0) + 1;
+                            });
+
+                            const excessiveDuplicates = Object.keys(titleCounts).filter(title => titleCounts[title] > 3);
+                            
+                            if (excessiveDuplicates.length > 0) {
+                                excessiveDuplicates.forEach(title => {
+                                    problemLinks.lackingVariation.push({
+                                        section: section.section,
+                                        title: title,
+                                        count: titleCounts[title],
+                                        reason: `Section content lacks variety - same title appears ${titleCounts[title]} times`
+                                    });
+                                });
+                            }
+                        }
+                    });
+                }
+
+                // Process all categories for detailed error collection with user-friendly messages
+                // Use a Set to track processed links and avoid duplicates
+                const processedLinks = new Set();
+                
+                Object.keys(detailedResults).forEach(category => {
+                    if (category === 'sectionBreakdown') return;
+                    
+                    const links = detailedResults[category] || [];
+                    
+                    links.forEach(link => {
+                        const linkKey = `${link.href}-${link.text}`;
+                        
+                        // Skip if already processed
+                        if (processedLinks.has(linkKey)) {
+                            return;
+                        }
+                        
+                        const linkInfo = {
+                            text: link.text,
+                            href: link.href,
+                            category: category.replace('Links', ''),
+                            error: link.error || link.validationError || link.availabilityError
+                        };
+
+                        // PRIORITY 1: Wrong contact paths (highest priority)
+                        if (category === 'wrongContactPathLinks') {
+                            problemLinks.wrongPaths.push({
+                                ...linkInfo,
+                                reason: this.convertToUserFriendlyError('wrong path contactt', 'wrong-contact-path', destination, link.text)
+                            });
+                            processedLinks.add(linkKey);
+                            return;
+                        }
+
+                        // PRIORITY 2: Unavailable links (content not available)
+                        if (link.available === false) {
+                            const unavailableMsg = this.getUnavailableMessage(link.category, destination, link.text);
+                            let finalReason = unavailableMsg;
+                            
+                            // Add additional context if redirected or has errors
+                            const additionalInfo = [];
+                            if (link.redirected) {
+                                additionalInfo.push('page has moved');
+                            }
+                            if (linkInfo.error) {
+                                const userFriendlyError = this.convertToUserFriendlyError(linkInfo.error, link.category, destination, link.text);
+                                additionalInfo.push(userFriendlyError.toLowerCase());
+                            }
+                            
+                            if (additionalInfo.length > 0) {
+                                finalReason = `${unavailableMsg} (${additionalInfo.join(', ')})`;
+                            }
+                            
+                            problemLinks.unavailable.push({
+                                ...linkInfo,
+                                reason: finalReason,
+                                resolvedUrl: link.resolvedUrl,
+                                status: link.status
+                            });
+                            processedLinks.add(linkKey);
+                            return;
+                        }
+
+                        // PRIORITY 3: Invalid links (but only if not redirected)
+                        if (link.valid === false && !link.redirected) {
+                            const userFriendlyError = this.convertToUserFriendlyError(
+                                link.validationError || `HTTP ${link.status}` || 'validation failed', 
+                                link.category, 
+                                destination, 
+                                link.text
+                            );
+                            
+                            problemLinks.invalid.push({
+                                ...linkInfo,
+                                status: link.status,
+                                reason: userFriendlyError
+                            });
+                            processedLinks.add(linkKey);
+                            return;
+                        }
+
+                        // PRIORITY 4: Redirected links (only if valid but redirected)
+                        if (link.redirected === true) {
+                            let reason = 'Page has moved to a different location';
+                            
+                            // Add validation context if invalid
+                            if (link.valid === false) {
+                                const validationError = this.convertToUserFriendlyError(
+                                    link.validationError || `HTTP ${link.status}` || 'validation failed', 
+                                    link.category, 
+                                    destination, 
+                                    link.text
+                                );
+                                reason = `Page has moved and has issues (${validationError.toLowerCase()})`;
+                            }
+                            
+                            problemLinks.redirected.push({
+                                ...linkInfo,
+                                resolvedUrl: link.resolvedUrl,
+                                status: link.status,
+                                reason: reason
+                            });
+                            processedLinks.add(linkKey);
+                            return;
+                        }
+
+                        // PRIORITY 5: General errors (only if not covered by above categories)
+                        if (linkInfo.error && linkInfo.error !== '-' && 
+                            link.available !== false && 
+                            link.valid !== false && 
+                            !link.redirected) {
+                            const userFriendlyError = this.convertToUserFriendlyError(linkInfo.error, link.category, destination, link.text);
+                            problemLinks.errors.push({
+                                ...linkInfo,
+                                reason: userFriendlyError
+                            });
+                            processedLinks.add(linkKey);
+                            return;
+                        }
+                    });
+                });
+
+                // Create detailed insights with updated titles
+                if (problemLinks.wrongPaths.length > 0) {
+                    insights.push({
+                        type: 'error',
+                        title: `🚨 Website Address Errors (${problemLinks.wrongPaths.length})`,
+                        items: problemLinks.wrongPaths,
+                        priority: 'high'
+                    });
+                }
+
+                if (problemLinks.unavailable.length > 0) {
+                    insights.push({
+                        type: 'warning',
+                        title: `❌ Content No Longer Available (${problemLinks.unavailable.length})`,
+                        items: problemLinks.unavailable,
+                        priority: 'high'
+                    });
+                }
+
+                if (problemLinks.invalid.length > 0) {
+                    insights.push({
+                        type: 'warning',
+                        title: `🔗 Broken Pages (${problemLinks.invalid.length})`,
+                        items: problemLinks.invalid,
+                        priority: 'medium'
+                    });
+                }
+
+                if (problemLinks.redirected.length > 0) {
+                    insights.push({
+                        type: 'info',
+                        title: `↗️ Pages That Have Moved (${problemLinks.redirected.length})`,
+                        items: problemLinks.redirected,
+                        priority: 'low'
+                    });
+                }
+
+                if (problemLinks.lackingVariation.length > 0) {
+                    insights.push({
+                        type: 'info',
+                        title: `📝 Content Variety Issues (${problemLinks.lackingVariation.length} issues)`,
+                        items: problemLinks.lackingVariation,
+                        priority: 'medium'
+                    });
+                }
+
+                if (problemLinks.errors.length > 0) {
+                    insights.push({
+                        type: 'error',
+                        title: `⚠️ Other Issues (${problemLinks.errors.length})`,
+                        items: problemLinks.errors,
+                        priority: 'medium'
+                    });
+                }
+
+                // Display insights
+                const insightsPanel = document.getElementById('insightsPanel');
+                const insightsContent = document.getElementById('insightsContent');
+
+                if (insights.length > 0) {
+                    insights.sort((a, b) => {
+                        const priorityOrder = { 'high': 0, 'medium': 1, 'low': 2 };
+                        return priorityOrder[a.priority] - priorityOrder[b.priority];
+                    });
+
+                    const totalIssues = insights.reduce((sum, insight) => sum + insight.items.length, 0);
+
+                    const summaryHtml = `
+                        <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; text-align: center;">
+                            <h4 style="margin: 0 0 0.5rem 0; color: #856404;">
+                                📊 Total Issues Found: <span style="color: #d32f2f; font-size: 1.2em;">${totalIssues}</span>
+                            </h4>
+                            <p style="margin: 0; color: #856404; font-size: 14px;">
+                                Issues are sorted by priority: 🚨 High → ⚠️ Medium → ℹ️ Low
+                            </p>
+                        </div>
+                    `;
+
+                    insightsContent.innerHTML = summaryHtml + insights.map(insight => {
+                        const color = insight.type === 'error' ? '#f44336' : 
+                                     insight.type === 'warning' ? '#FF9800' : '#2196F3';
+                        const bgColor = insight.type === 'error' ? '#ffebee' : 
+                                       insight.type === 'warning' ? '#fff3e0' : '#e3f2fd';
+                        const textColor = insight.type === 'error' ? '#c62828' : 
+                                         insight.type === 'warning' ? '#ef6c00' : '#1565c0';
+
+                        let itemsList = '';
+                        
+                        if (insight.title.includes('Content Variety')) {
+                            itemsList = insight.items.map(item => `
+                                <div class="insight-link-item" style="border-left-color: ${color};">
+                                    <div class="link-text">
+                                        ${item.section} Section
+                                        <span class="category-tag">Content Structure</span>
+                                    </div>
+                                    <div class="link-url">
+                                        Title: "<strong>${item.title}</strong>" (appears ${item.count} times)
+                                    </div>
+                                    <div class="link-error">
+                                        ${item.reason}
+                                    </div>
+                                </div>
+                            `).join('');
+                        } else {
+                            itemsList = insight.items.map(item => `
+                                <div class="insight-link-item" style="border-left-color: ${color};">
+                                    <div class="link-text">
+                                        ${this.escapeHtml(item.text)}
+                                        <span class="category-tag">${item.category}</span>
+                                    </div>
+                                    <div class="link-url">
+                                        <a href="${item.href}" target="_blank" style="color: #1976d2; text-decoration: none;">${item.href}</a>
+                                    </div>
+                                    <div class="link-error">
+                                        ${item.reason}
+                                        ${item.resolvedUrl ? `<br><strong>Page moved to:</strong> <a href="${item.resolvedUrl}" target="_blank" style="color: #1976d2;">${item.resolvedUrl}</a>` : ''}
+                                        ${item.status ? `<br><strong>Status:</strong> ${item.status}` : ''}
+                                    </div>
+                                </div>
+                            `).join('');
+                        }
+
+                        return `
+                            <div class="insight-item" style="border: 1px solid ${color};">
+                                <div class="insight-header" style="background: ${bgColor}; border-bottom-color: ${color};">
+                                    <h4 style="margin: 0; color: ${textColor};">${insight.title}</h4>
+                                </div>
+                                <div class="insight-content">
+                                    ${itemsList}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                    
+                    insightsPanel.style.display = 'block';
+                } else {
+                    insightsContent.innerHTML = `
+                        <div style="text-align: center; color: #4CAF50; padding: 2rem; background: #e8f5e9; border-radius: 8px;">
+                            <div style="font-size: 3rem; margin-bottom: 1rem;">✅</div>
+                            <h4 style="margin: 0 0 0.5rem 0; color: #2e7d32;">No Critical Issues Found!</h4>
+                            <p style="margin: 0; color: #388e3c;">All analyzed links appear to be working correctly. Great job!</p>
+                        </div>
+                    `;
+                    insightsPanel.style.display = 'block';
+                }
+            }
+
+            renderCharts() {
+                this.destroyCharts();
+                
+                // Category Chart
+                this.renderCategoryChart();
+                
+                // Availability Chart
+                this.renderAvailabilityChart();
+                
+                // Validation Chart
+                this.renderValidationChart();
+                
+                // Source Chart
+                this.renderSourceChart();
+            }
+
+            renderCategoryChart() {
+                const ctx = document.getElementById('categoryChart').getContext('2d');
+                const categories = this.data.stats.categoryCounts;
+
+                this.charts.category = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: Object.keys(categories),
+                        datasets: [{
+                            data: Object.values(categories),
+                            backgroundColor: [
+                                '#667eea', '#764ba2', '#f093fb', '#f5576c',
+                                '#4facfe', '#00f2fe', '#43e97b', '#38f9d7',
+                                '#ffecd2', '#fcb69f', '#a8edea', '#fed6e3'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            }
+                        }
+                    }
+                });
+            }
+
+            renderAvailabilityChart() {
+                const ctx = document.getElementById('availabilityChart').getContext('2d');
+                const stats = this.data.stats;
+                
+                const availabilityData = {
+                    'Available': 0,
+                    'Unavailable': 0,
+                    'Unknown': 0
+                };
+
+                // Aggregate availability data from all sources
+                if (stats.cruiseAvailability) {
+                    availabilityData.Available += stats.cruiseAvailability.available || 0;
+                    availabilityData.Unavailable += stats.cruiseAvailability.unavailable || 0;
+                }
+
+                if (stats.tourActivityValidation) {
+                    availabilityData.Available += stats.tourActivityValidation.available || 0;
+                    availabilityData.Unavailable += stats.tourActivityValidation.unavailable || 0;
+                }
+
+                if (stats.cruiseShipValidation) {
+                    availabilityData.Available += stats.cruiseShipValidation.available || 0;
+                    availabilityData.Unavailable += stats.cruiseShipValidation.unavailable || 0;
+                }
+
+                if (stats.storyValidation) {
+                    availabilityData.Available += stats.storyValidation.available || 0;
+                    availabilityData.Unavailable += stats.storyValidation.unavailable || 0;
+                }
+
+                if (stats.contactPageValidation) {
+                    availabilityData.Available += stats.contactPageValidation.available || 0;
+                    availabilityData.Unavailable += stats.contactPageValidation.unavailable || 0;
+                }
+
+                if (stats.externalLinkValidation) {
+                    availabilityData.Available += stats.externalLinkValidation.available || 0;
+                    availabilityData.Unavailable += stats.externalLinkValidation.unavailable || 0;
+                }
+
+                if (stats.wrongContactPathValidation) {
+                    availabilityData.Unavailable += stats.wrongContactPathValidation.total || 0;
+                }
+
+                const totalTested = availabilityData.Available + availabilityData.Unavailable;
+                availabilityData.Unknown = Math.max(0, stats.totalLinks - totalTested);
+
+                this.charts.availability = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(availabilityData),
+                        datasets: [{
+                            label: 'Links',
+                            data: Object.values(availabilityData),
+                            backgroundColor: ['#4CAF50', '#f44336', '#9E9E9E']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            }
+
+            renderValidationChart() {
+                const ctx = document.getElementById('validationChart').getContext('2d');
+                const stats = this.data.stats;
+                
+                const validationData = {
+                    'Valid': 0,
+                    'Invalid': 0,
+                    'Redirected': 0
+                };
+
+                // Aggregate validation data from all sources
+                if (stats.destinationValidation) {
+                    validationData.Valid += stats.destinationValidation.valid || 0;
+                    validationData.Invalid += stats.destinationValidation.invalid || 0;
+                    validationData.Redirected += stats.destinationValidation.redirected || 0;
+                }
+
+                if (stats.tourActivityValidation) {
+                    validationData.Valid += stats.tourActivityValidation.valid || 0;
+                    validationData.Invalid += stats.tourActivityValidation.invalid || 0;
+                    validationData.Redirected += stats.tourActivityValidation.redirected || 0;
+                }
+
+                if (stats.cruiseShipValidation) {
+                    validationData.Valid += stats.cruiseShipValidation.valid || 0;
+                    validationData.Invalid += stats.cruiseShipValidation.invalid || 0;
+                    validationData.Redirected += stats.cruiseShipValidation.redirected || 0;
+                }
+
+                if (stats.destinationSpecialPageValidation) {
+                    validationData.Valid += stats.destinationSpecialPageValidation.valid || 0;
+                    validationData.Invalid += stats.destinationSpecialPageValidation.invalid || 0;
+                    validationData.Redirected += stats.destinationSpecialPageValidation.redirected || 0;
+                }
+
+                if (stats.storyValidation) {
+                    validationData.Valid += stats.storyValidation.valid || 0;
+                    validationData.Invalid += stats.storyValidation.invalid || 0;
+                    validationData.Redirected += stats.storyValidation.redirected || 0;
+                }
+
+                if (stats.contactPageValidation) {
+                    validationData.Valid += stats.contactPageValidation.valid || 0;
+                    validationData.Invalid += stats.contactPageValidation.invalid || 0;
+                    validationData.Redirected += stats.contactPageValidation.redirected || 0;
+                }
+
+                if (stats.wrongContactPathValidation) {
+                    validationData.Invalid += stats.wrongContactPathValidation.total || 0;
+                }
+
+                if (stats.externalLinkValidation) {
+                    validationData.Valid += stats.externalLinkValidation.valid || 0;
+                    validationData.Invalid += stats.externalLinkValidation.invalid || 0;
+                    validationData.Redirected += stats.externalLinkValidation.redirected || 0;
+                }
+
+                this.charts.validation = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: Object.keys(validationData),
+                        datasets: [{
+                            data: Object.values(validationData),
+                            backgroundColor: ['#4CAF50', '#f44336', '#FF9800']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            }
+                        }
+                    }
+                });
+            }
+
+            renderSourceChart() {
+                const ctx = document.getElementById('sourceChart').getContext('2d');
+                const stats = this.data.stats;
+
+                this.charts.source = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Intro Section', 'Main Section'],
+                        datasets: [{
+                            data: [stats.totalIntroLinks, stats.totalMainLinks],
+                            backgroundColor: ['#667eea', '#4CAF50']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            }
+                        }
+                    }
+                });
+            }
+
+            renderDetailTables() {
+                this.renderDetailView('section');
+                this.renderDetailView('urlpattern');
+            }
+
+            renderDetailView(viewType) {
+                if (viewType === 'section') {
+                    this.renderSectionView();
+                } else if (viewType === 'urlpattern') {
+                    this.renderUrlPatternView();
+                }
+            }
+
+            renderSectionView() {
+                const container = document.getElementById('sectionView');
+                container.innerHTML = '';
+
+                if (this.data.detailedResults && this.data.detailedResults.sectionBreakdown) {
+                    this.renderSectionBasedTables(container);
+                } else if (this.data.linksBySection) {
+                    this.renderLinksBySection(container);
+                } else {
+                    container.innerHTML = '<div style="padding: 2rem; text-align: center; color: #666;">Section data not available in this API version</div>';
+                }
+            }
+
+            renderUrlPatternView() {
+                const container = document.getElementById('urlpatternView');
+                container.innerHTML = '';
+
+                if (this.data.linksByCategory) {
+                    this.renderUrlPatternBasedTables(container);
+                } else {
+                    container.innerHTML = '<div style="padding: 2rem; text-align: center; color: #666;">URL pattern data not available</div>';
+                }
+            }
+
+            renderLinksBySection(container) {
+                const linksBySection = this.data.linksBySection;
+                
+                Object.keys(linksBySection).forEach(sectionType => {
+                    const titleGroups = linksBySection[sectionType];
+                    if (titleGroups && titleGroups.length > 0) {
+                        const sectionData = {
+                            section: sectionType,
+                            totalLinks: titleGroups.reduce((sum, group) => sum + group.links.length, 0),
+                            categories: {},
+                            titleGroups: titleGroups
+                        };
+                        
+                        titleGroups.forEach(group => {
+                            group.links.forEach(link => {
+                                const category = link.category || 'unknown';
+                                sectionData.categories[category] = (sectionData.categories[category] || 0) + 1;
+                            });
+                        });
+
+                        const sectionHtml = this.createSectionTable(sectionData);
+                        container.insertAdjacentHTML('beforeend', sectionHtml);
+                    }
+                });
+            }
+
+            renderUrlPatternBasedTables(container) {
+                const urlPatterns = Object.keys(this.data.linksByCategory);
+                
+                if (urlPatterns.length > 1) {
+                    const patternNav = `
+                        <div class="table-container" style="margin-bottom: 1rem;">
+                            <div class="table-header">
+                                <h3>🔗 Navigate to URL Pattern</h3>
+                            </div>
+                            <div style="padding: 1rem; display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                                ${urlPatterns.map(pattern => `
+                                    <button class="btn btn-secondary" onclick="document.getElementById('pattern-${this.sanitizeId(pattern)}').scrollIntoView({behavior: 'smooth'})">
+                                        ${pattern} (${this.data.linksByCategory[pattern].length})
+                                    </button>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                    container.insertAdjacentHTML('beforeend', patternNav);
+                }
+
+                urlPatterns.forEach(pattern => {
+                    const links = this.data.linksByCategory[pattern];
+                    if (links && links.length > 0) {
+                        const patternHtml = this.createUrlPatternTable(pattern, links);
+                        container.insertAdjacentHTML('beforeend', patternHtml);
+                    }
+                });
+            }
+
+            createUrlPatternTable(pattern, links) {
+                const patternId = `pattern-${this.sanitizeId(pattern)}`;
+                const tableId = `table-${this.sanitizeId(pattern)}`;
+                
+                return `
+                    <div class="table-container" id="${patternId}" style="margin-bottom: 2rem;">
+                        <div class="table-header">
+                            <h3>🔗 ${pattern} (${links.length} links)</h3>
+                            <div style="margin-top: 0.5rem;">
+                                <input type="text" placeholder="Search in this pattern..." 
+                                       onkeyup="filterTable('${tableId}', this.value)"
+                                       style="padding: 6px; border-radius: 4px; border: 1px solid #ddd; width: 300px;">
+                            </div>
+                        </div>
+                        <div class="table-wrapper">
+                            ${this.createUrlPatternLinksTable(tableId, links)}
+                        </div>
+                    </div>
+                `;
+            }
+
+            createUrlPatternLinksTable(tableId, links) {
+                if (!links || links.length === 0) {
+                    return '<div style="padding: 1rem; text-align: center; color: #666;">No links found</div>';
+                }
+
+                const destination = this.extractDestinationFromUrl(this.auditUrl);
+
+                let headers = ['Available/Valid', 'Text', 'URL'];
+                const hasAvailability = links.some(link => link.available !== undefined);
+                const hasValidation = links.some(link => link.valid !== undefined);
+                const hasPrice = links.some(link => link.price !== undefined);
+                const hasShipOptions = links.some(link => link.shipOptions !== undefined);
+                const hasExperienceOptions = links.some(link => link.experienceOptions !== undefined);
+                const hasPageType = links.some(link => link.pageType !== undefined);
+                const hasErrors = links.some(link => 
+                    link.validationError || link.availabilityError || link.error);
+
+                if (hasPrice) headers.push('Price');
+                if (hasShipOptions) headers.push('Ships Found');
+                if (hasPageType) headers.push('Page Type');
+                if (hasExperienceOptions) headers.push('Activity/Experience Options');
+                if (hasValidation) headers.push('HTTP Status', 'Redirected');
+                if (hasErrors) headers.push('Error Details');
+
+                const rows = links.map(link => {
+                    let row = '<tr>';
+                    
+                    let statusBadge = '';
+                    
+                    if (link.available !== undefined) {
+                        statusBadge = `<span class="status-badge ${link.available ? 'status-available' : 'status-unavailable'}">${link.available ? 'Available' : 'Unavailable'}</span>`;
+                    } else if (link.valid !== undefined) {
+                        statusBadge = `<span class="status-badge ${link.valid ? 'status-valid' : 'status-invalid'}">${link.valid ? 'Valid' : 'Invalid'}</span>`;
+                    } else {
+                        statusBadge = '<span class="status-badge status-unknown">Unknown</span>';
+                    }
+                    
+                    row += `<td>${statusBadge}</td>`;
+                    row += `<td>${this.escapeHtml(link.text)}</td>`;
+                    row += `<td><a href="${link.href}" target="_blank" class="url-link">${link.href}</a></td>`;
+                    
+                    if (hasPrice) {
+                        row += `<td>${link.price ? `${link.price} ${link.currency || ''}` : '-'}</td>`;
+                    }
+                    if (hasShipOptions) {
+                        row += `<td>${link.shipOptions ? `${link.shipOptions.length} ships` : '-'}</td>`;
+                    }
+                    if (hasPageType) {
+                        const pageTypeStyle = link.pageType === 'landing' ? 'background: #e8f5e9; color: #2e7d32;' : 
+                                             link.pageType === 'index' ? 'background: #e3f2fd; color: #1976d2;' : '';
+                        row += `<td><span class="category-badge" style="${pageTypeStyle}">${link.pageType || 'Unknown'}</span></td>`;
+                    }
+                    if (hasExperienceOptions) {
+                        let optionsText = '';
+                        if (link.experienceOptions && link.experienceOptions.length > 0) {
+                            optionsText = `${link.experienceOptions.length} experiences`;
+                        } else if (link.activityPath) {
+                            optionsText = `Activity: ${link.activityPath}`;
+                        } else {
+                            optionsText = '0 options';
+                        }
+                        row += `<td>${optionsText}</td>`;
+                    }
+                    if (hasValidation) {
+                        row += `<td>${link.status || '-'}</td>`;
+                        row += `<td><span class="status-badge ${link.redirected ? 'status-unavailable' : 'status-available'}">${link.redirected ? 'Yes' : 'No'}</span></td>`;
+                    }
+                    if (hasErrors) {
+                        const allErrors = [];
+                        if (link.validationError) {
+                            allErrors.push(this.convertToUserFriendlyError(link.validationError, link.category, destination, link.text));
+                        }
+                        if (link.availabilityError) {
+                            allErrors.push(this.convertToUserFriendlyError(link.availabilityError, link.category, destination, link.text));
+                        }
+                        if (link.error) {
+                            allErrors.push(this.convertToUserFriendlyError(link.error, link.category, destination, link.text));
+                        }
+                        row += `<td>${allErrors.length > 0 ? allErrors.join('<br>') : '-'}</td>`;
+                    }
+                    
+                    row += '</tr>';
+                    return row;
+                }).join('');
+
+                return `
+                    <table id="${tableId}">
+                        <thead>
+                            <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
+                        </thead>
+                        <tbody>
+                            ${rows}
+                        </tbody>
+                    </table>
+                `;
+            }
+
+            sanitizeId(str) {
+                return str.replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+            }
+
+            renderSectionBasedTables(container) {
+                const sectionBreakdown = this.data.detailedResults.sectionBreakdown;
+                
+                if (sectionBreakdown.length > 1) {
+                    const sectionNav = `
+                        <div class="table-container" style="margin-bottom: 1rem;">
+                            <div class="table-header">
+                                <h3>📋 Navigate to Section</h3>
+                            </div>
+                            <div style="padding: 1rem; display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                                ${sectionBreakdown.map(section => `
+                                    <button class="btn btn-secondary" onclick="document.getElementById('section-${section.section}').scrollIntoView({behavior: 'smooth'})">
+                                        ${section.section} (${section.totalLinks})
+                                    </button>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                    container.insertAdjacentHTML('beforeend', sectionNav);
+                }
+
+                sectionBreakdown.forEach(section => {
+                    if (section.titleGroups && section.titleGroups.length > 0) {
+                        const sectionHtml = this.createSectionTable(section);
+                        container.insertAdjacentHTML('beforeend', sectionHtml);
+                    }
+                });
+            }
+
+            createSectionTable(section) {
+                const sectionId = `section-${section.section}`;
+                const destination = this.extractDestinationFromUrl(this.auditUrl);
+                
+                const titleCounts = {};
+                section.titleGroups.forEach(titleGroup => {
+                    const title = titleGroup.title;
+                    titleCounts[title] = (titleCounts[title] || 0) + 1;
+                });
+                
+                const duplicateTitles = Object.keys(titleCounts).filter(title => titleCounts[title] > 1);
+                const hasDuplicates = duplicateTitles.length > 0;
+                
+                let sectionHeaderHtml = `
+                    <div class="table-container" id="${sectionId}" style="margin-bottom: 2rem;">
+                        <div class="table-header">
+                            <h3>📍 ${section.section} Section (${section.totalLinks} links)</h3>
+                            ${hasDuplicates ? `
+                                <div style="margin-top: 0.5rem; padding: 0.5rem; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;">
+                                    <small style="color: #856404;">
+                                        ⚠️ <strong>Content variety issue:</strong> ${duplicateTitles.map(title => `"${title}" (${titleCounts[title]}x)`).join(', ')}
+                                    </small>
+                                </div>
+                            ` : ''}
+                            <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                                ${Object.keys(section.categories).map(cat => `
+                                    <span class="category-badge" style="background: #e3f2fd; color: #1976d2; padding: 4px 8px;">
+                                        ${cat}: ${section.categories[cat]}
+                                    </span>
+                                `).join('')}
+                            </div>
+                        </div>
+                        <div style="padding: 0;">
+                `;
+
+                section.titleGroups.forEach((titleGroup, index) => {
+                    const titleTableId = `table-${section.section}-${index}`;
+                    const isDuplicate = titleCounts[titleGroup.title] > 1;
+                    
+                    sectionHeaderHtml += `
+                        <div style="border-top: 1px solid #ddd; ${index === 0 ? 'border-top: none;' : ''}">
+                            <div style="padding: 1rem; background: #f8f9fa; border-bottom: 1px solid #ddd; ${isDuplicate ? 'border-left: 4px solid #ffc107;' : ''}">
+                                <h4 style="margin: 0; color: #495057; ${isDuplicate ? 'display: flex; align-items: center; gap: 0.5rem;' : ''}">
+                                    ${isDuplicate ? '<span style="color: #f57c00; font-size: 16px;">⚠️</span>' : ''}
+                                    ${titleGroup.title} (${titleGroup.linkCount} links)
+                                    ${isDuplicate ? `<span style="background: #fff3cd; color: #856404; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: normal;">DUPLICATE ${titleCounts[titleGroup.title]}x</span>` : ''}
+                                </h4>
+                                <div style="margin-top: 0.5rem;">
+                                    <input type="text" placeholder="Search in this section..." 
+                                           onkeyup="filterTable('${titleTableId}', this.value)"
+                                           style="padding: 6px; border-radius: 4px; border: 1px solid #ddd; width: 300px;">
+                                </div>
+                            </div>
+                            <div class="table-wrapper">
+                                ${this.createLinksTable(titleTableId, titleGroup.links, destination)}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                sectionHeaderHtml += `
+                        </div>
+                    </div>
+                `;
+
+                return sectionHeaderHtml;
+            }
+
+            createLinksTable(tableId, links, destination) {
+                if (!links || links.length === 0) {
+                    return '<div style="padding: 1rem; text-align: center; color: #666;">No links found</div>';
+                }
+
+                let headers = ['Available/Valid', 'Reason', 'Text', 'URL', 'Category'];
+                const hasAvailability = links.some(link => link.available !== undefined);
+                const hasValidation = links.some(link => link.valid !== undefined);
+                const hasPrice = links.some(link => link.price !== undefined);
+                const hasShipOptions = links.some(link => link.shipOptions !== undefined);
+                const hasExperienceOptions = links.some(link => link.experienceOptions !== undefined);
+                const hasErrors = links.some(link => 
+                    link.validationError || link.availabilityError || link.error);
+
+                if (hasPrice) headers.push('Price');
+                if (hasShipOptions) headers.push('Ships Found');
+                if (hasExperienceOptions) headers.push('Experience Options');
+                if (hasValidation) headers.push('HTTP Status', 'Redirected');
+                if (hasErrors) headers.push('Additional Errors');
+
+                const rows = links.map(link => {
+                    let row = '<tr>';
+                    
+                    let statusBadge = '';
+                    const reasonText = this.getUserFriendlyReason(link, destination);
+                    
+                    if (link.available !== undefined) {
+                        statusBadge = `<span class="status-badge ${link.available ? 'status-available' : 'status-unavailable'}">${link.available ? 'Available' : 'Unavailable'}</span>`;
+                    } else if (link.valid !== undefined) {
+                        statusBadge = `<span class="status-badge ${link.valid ? 'status-valid' : 'status-invalid'}">${link.valid ? 'Valid' : 'Invalid'}</span>`;
+                    } else {
+                        statusBadge = '<span class="status-badge status-unknown">Unknown</span>';
+                    }
+                    
+                    row += `<td>${statusBadge}</td>`;
+                    row += `<td style="font-size: 12px; color: #666;">${reasonText}</td>`;
+                    row += `<td>${this.escapeHtml(link.text)}</td>`;
+                    row += `<td><a href="${link.href}" target="_blank" class="url-link">${link.href}</a></td>`;
+                    row += `<td><span class="category-badge">${link.category || 'Unknown'}</span></td>`;
+                    
+                    if (hasPrice) {
+                        row += `<td>${link.price ? `${link.price} ${link.currency || ''}` : '-'}</td>`;
+                    }
+                    if (hasShipOptions) {
+                        row += `<td>${link.shipOptions ? `${link.shipOptions.length} ships` : '-'}</td>`;
+                    }
+                    if (hasExperienceOptions) {
+                        row += `<td>${link.experienceOptions ? `${link.experienceOptions.length} options` : '-'}</td>`;
+                    }
+                    if (hasValidation) {
+                        row += `<td>${link.status || '-'}</td>`;
+                        row += `<td><span class="status-badge ${link.redirected ? 'status-unavailable' : 'status-available'}">${link.redirected ? 'Yes' : 'No'}</span></td>`;
+                    }
+                    if (hasErrors) {
+                        const additionalErrors = [];
+                        if (link.validationError && !reasonText.includes(link.validationError)) {
+                            additionalErrors.push(this.convertToUserFriendlyError(link.validationError, link.category, destination, link.text));
+                        }
+                        if (link.availabilityError && !reasonText.includes(link.availabilityError)) {
+                            additionalErrors.push(this.convertToUserFriendlyError(link.availabilityError, link.category, destination, link.text));
+                        }
+                        if (link.error && !reasonText.includes(link.error)) {
+                            additionalErrors.push(this.convertToUserFriendlyError(link.error, link.category, destination, link.text));
+                        }
+                        row += `<td>${additionalErrors.length > 0 ? additionalErrors.join('<br>') : '-'}</td>`;
+                    }
+                    
+                    row += '</tr>';
+                    return row;
+                }).join('');
+
+                return `
+                    <table id="${tableId}">
+                        <thead>
+                            <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
+                        </thead>
+                        <tbody>
+                            ${rows}
+                        </tbody>
+                    </table>
+                `;
+            }
+
+            exportJson() {
+                if (!this.data) return;
+                
+                const dataStr = JSON.stringify(this.data, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+                
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `link-audit-${new Date().getTime()}.json`;
+                link.click();
+                
+                URL.revokeObjectURL(url);
+            }
+
+            exportCsv() {
+                if (!this.data) return;
+                
+                const destination = this.extractDestinationFromUrl(this.auditUrl);
+                let csv = 'Category,Text,URL,Status,Reason,Additional Info\n';
+                
+                Object.keys(this.data.linksByCategory).forEach(category => {
+                    this.data.linksByCategory[category].forEach(link => {
+                        const text = `"${link.text.replace(/"/g, '""')}"`;
+                        const url = `"${link.href}"`;
+                        const status = link.available !== undefined ? (link.available ? 'Available' : 'Unavailable') : 
+                                     link.valid !== undefined ? (link.valid ? 'Valid' : 'Invalid') : 'Unknown';
+                        const reason = `"${this.getUserFriendlyReason(link, destination).replace(/"/g, '""')}"`;
+                        const additionalInfo = link.price ? `Price: ${link.price}` : 
+                                             link.error ? this.convertToUserFriendlyError(link.error, category, destination, link.text) : '';
+                        
+                        csv += `${category},${text},${url},${status},${reason},"${additionalInfo}"\n`;
+                    });
+                });
+                
+                const dataBlob = new Blob([csv], { type: 'text/csv' });
+                const url = URL.createObjectURL(dataBlob);
+                
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `link-audit-${new Date().getTime()}.csv`;
+                link.click();
+                
+                URL.revokeObjectURL(url);
+            }
+
+            printReport() {
+                window.print();
+            }
+
+            destroyCharts() {
+                Object.values(this.charts).forEach(chart => {
+                    if (chart) chart.destroy();
+                });
+                this.charts = {};
+            }
+
+            showLoading(show) {
+                document.getElementById('loadingState').classList.toggle('hidden', !show);
+                document.getElementById('analyzeBtn').disabled = show;
+            }
+
+            showError(message) {
+                const errorState = document.getElementById('errorState');
+                errorState.textContent = message;
+                errorState.classList.remove('hidden');
+            }
+
+            showSuccess(message) {
+                const successDiv = document.createElement('div');
+                successDiv.className = 'success';
+                successDiv.textContent = message;
+                document.querySelector('.container').insertBefore(successDiv, document.getElementById('loadingState'));
+                
+                setTimeout(() => successDiv.remove(), 5000);
+            }
+
+            clearError() {
+                document.getElementById('errorState').classList.add('hidden');
+            }
+
+            clearResults() {
+                this.data = null;
+                this.auditUrl = '';
+                this.destroyCharts();
+                document.getElementById('resultsSection').classList.add('hidden');
+                document.getElementById('insightsPanel').style.display = 'none';
+                this.clearError();
+                
+                this.switchTab('summary');
+                
+                document.querySelectorAll('.sub-tab-btn').forEach(btn => btn.classList.remove('active'));
+                document.querySelector('[data-subtab="section"]').classList.add('active');
+                document.querySelectorAll('.sub-tab-content').forEach(content => content.classList.add('hidden'));
+                document.getElementById('sectionView').classList.remove('hidden');
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+        }
+
+        // Global function for table filtering
+        function filterTable(tableId, searchTerm) {
+            const table = document.getElementById(tableId);
+            const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+            
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                const text = row.textContent.toLowerCase();
+                const isVisible = text.includes(searchTerm.toLowerCase());
+                row.style.display = isVisible ? '' : 'none';
+            }
+        }
+
+        // Initialize dashboard when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new LinkAuditDashboard();
+        });
+    </script>
+</body>
+</html>
