@@ -4,6 +4,7 @@ dotenv.config();
 import express from 'express';
 import cors from 'cors';
 import auditScriptRoutes from './routes/audit_script.js';
+import articleAuditRoutes from "./routes/article_audit.js"
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -23,6 +24,7 @@ app.get('/', (req, res) => {
 
 // API routes
 app.use('/api/v1/audit-script', auditScriptRoutes);
+app.use('/api/v1/article-audit', articleAuditRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
