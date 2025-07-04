@@ -2156,6 +2156,30 @@ router.post('/', async (req, res) => {
                     resolvedUrl: link.resolvedUrl,
                     error: link.validationError
                 })),
+                tourWithIdLinks: tourWithIdLinks.map(link => ({
+                  text: link.text,
+                  href: link.href,
+                  position: link.position,
+                  section: link.section,
+                  sectionTitle: link.sectionTitle,
+                  valid: link.valid,
+                  status: link.status,
+                  redirected: link.redirected,
+                  resolvedUrl: link.resolvedUrl,
+                  validationError: link.validationError,
+                  available: link.available,
+                  tourId: link.tourId,
+                  price: link.price,
+                  currency: link.currency,
+                  priceText: link.priceText,
+                  priceSelector: link.priceSelector,
+                  pageTitle: link.pageTitle,
+                  departureInfo: link.departureInfo,
+                  durationInfo: link.durationInfo,
+                  availabilityError: link.availabilityError,
+                  // Add URL pattern for frontend processing
+                  urlPattern: 'tour-with-id'
+              })),
                 // UPDATED: Enhanced tour-activity detailed results with new activity options fields
                 tourActivityLinks: tourActivityLinks.map(link => ({
                     text: link.text,

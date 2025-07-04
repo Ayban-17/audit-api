@@ -47,6 +47,121 @@
             margin-bottom: 1rem;
         }
 
+        .env-controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .env-toggle {
+            display: flex;
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            padding: 2px;
+            gap: 2px;
+        }
+
+        .env-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 18px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            background: transparent;
+            color: rgba(255,255,255,0.7);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .env-btn.active {
+            background: rgba(255,255,255,0.9);
+            color: #667eea;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .env-btn:hover:not(.active) {
+            background: rgba(255,255,255,0.1);
+            color: rgba(255,255,255,0.9);
+        }
+
+        .env-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 12px;
+            color: rgba(255,255,255,0.8);
+        }
+
+        .env-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .env-status.dev {
+            background: #4CAF50;
+        }
+
+        .env-status.prod {
+            background: #FF5722;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .endpoint-controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .endpoint-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: rgba(255,255,255,0.9);
+            min-width: 100px;
+        }
+
+        .endpoint-input-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .manual-toggle {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 4px;
+            padding: 4px 8px;
+            color: rgba(255,255,255,0.8);
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .manual-toggle:hover {
+            background: rgba(255,255,255,0.3);
+            color: white;
+        }
+
+        .manual-toggle.active {
+            background: #FF9800;
+            color: white;
+            border-color: #FF9800;
+        }
+
         .input-group {
             display: flex;
             gap: 10px;
@@ -66,6 +181,11 @@
         .input-group input:focus {
             outline: none;
             box-shadow: 0 0 10px rgba(255,255,255,0.3);
+        }
+
+        .input-group input:disabled {
+            background-color: #f5f5f5;
+            color: #666;
         }
 
         .btn {
@@ -388,6 +508,21 @@
                 font-size: 1.8rem;
             }
 
+            .env-controls {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .endpoint-controls {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .endpoint-input-group {
+                width: 100%;
+                min-width: auto;
+            }
+
             .input-group {
                 flex-direction: column;
             }
@@ -525,9 +660,28 @@
             <h1>🔍 Link Audit Dashboard</h1>
             
             <div class="api-config">
-                <label for="apiEndpoint">API Endpoint:</label>
-                <div class="input-group">
-                    <input type="text" id="apiEndpoint" value="http://localhost:3000/routes/audit_script" placeholder="API Endpoint URL">
+                <!-- Environment Controls -->
+                <div class="env-controls">
+                    <div class="env-toggle">
+                        <button class="env-btn" id="devBtn" data-env="dev">🔧 Development</button>
+                        <button class="env-btn" id="prodBtn" data-env="prod">🚀 Production</button>
+                    </div>
+                    
+                    <div class="env-indicator">
+                        <div class="env-status" id="envStatus"></div>
+                        <span id="envText">Detecting environment...</span>
+                    </div>
+                </div>
+
+                <!-- API Endpoint Controls -->
+                <div class="endpoint-controls">
+                    <div class="endpoint-label">API Endpoint:</div>
+                    <div class="endpoint-input-group">
+                        <input type="text" id="apiEndpoint" placeholder="API Endpoint URL">
+                        <button class="manual-toggle" id="manualToggle" title="Enable manual endpoint editing">
+                            ✏️ Manual
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -642,10 +796,106 @@
                 this.data = null;
                 this.charts = {};
                 this.auditUrl = '';
+                this.currentEnvironment = 'dev';
+                this.isManualMode = false;
+                
+                // API endpoints configuration
+                this.endpoints = {
+                    dev: 'http://localhost:3000/api/v1/audit-script',
+                    prod: 'https://audit-api-0wjt.onrender.com/api/v1/audit-script'
+                };
+                
+                this.initializeEnvironment();
                 this.initializeEventListeners();
             }
 
+            initializeEnvironment() {
+                // Auto-detect environment based on hostname
+                const hostname = window.location.hostname;
+                const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.') || hostname.startsWith('10.') || hostname.startsWith('172.');
+                
+                this.currentEnvironment = isLocalhost ? 'dev' : 'prod';
+                
+                // Update UI
+                this.updateEnvironmentUI();
+                this.updateApiEndpoint();
+                
+                console.log(`🌍 Environment detected: ${this.currentEnvironment.toUpperCase()}`);
+                console.log(`🔗 API Endpoint: ${this.endpoints[this.currentEnvironment]}`);
+            }
+
+            updateEnvironmentUI() {
+                const envStatus = document.getElementById('envStatus');
+                const envText = document.getElementById('envText');
+                const devBtn = document.getElementById('devBtn');
+                const prodBtn = document.getElementById('prodBtn');
+                
+                // Update status indicator
+                envStatus.className = `env-status ${this.currentEnvironment}`;
+                envText.textContent = this.currentEnvironment === 'dev' ? 
+                    'Development Environment' : 'Production Environment';
+                
+                // Update toggle buttons
+                devBtn.classList.toggle('active', this.currentEnvironment === 'dev');
+                prodBtn.classList.toggle('active', this.currentEnvironment === 'prod');
+            }
+
+            updateApiEndpoint() {
+                if (!this.isManualMode) {
+                    const apiEndpointInput = document.getElementById('apiEndpoint');
+                    apiEndpointInput.value = this.endpoints[this.currentEnvironment];
+                    apiEndpointInput.disabled = true;
+                }
+            }
+
+            toggleManualMode() {
+                this.isManualMode = !this.isManualMode;
+                const apiEndpointInput = document.getElementById('apiEndpoint');
+                const manualToggle = document.getElementById('manualToggle');
+                
+                if (this.isManualMode) {
+                    apiEndpointInput.disabled = false;
+                    manualToggle.classList.add('active');
+                    manualToggle.innerHTML = '🔒 Manual';
+                    manualToggle.title = 'Disable manual editing (use auto endpoints)';
+                } else {
+                    apiEndpointInput.disabled = true;
+                    manualToggle.classList.remove('active');
+                    manualToggle.innerHTML = '✏️ Manual';
+                    manualToggle.title = 'Enable manual endpoint editing';
+                    this.updateApiEndpoint();
+                }
+            }
+
+            switchEnvironment(environment) {
+                if (this.currentEnvironment === environment) return;
+                
+                this.currentEnvironment = environment;
+                this.updateEnvironmentUI();
+                
+                if (!this.isManualMode) {
+                    this.updateApiEndpoint();
+                }
+                
+                console.log(`🔄 Environment switched to: ${environment.toUpperCase()}`);
+                console.log(`🔗 API Endpoint: ${this.endpoints[environment]}`);
+            }
+
             initializeEventListeners() {
+                // Environment toggle buttons
+                document.getElementById('devBtn').addEventListener('click', () => {
+                    this.switchEnvironment('dev');
+                });
+                
+                document.getElementById('prodBtn').addEventListener('click', () => {
+                    this.switchEnvironment('prod');
+                });
+                
+                // Manual toggle button
+                document.getElementById('manualToggle').addEventListener('click', () => {
+                    this.toggleManualMode();
+                });
+
                 // Tab navigation
                 document.querySelectorAll('.tab-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => this.switchTab(e.target.dataset.tab));
@@ -888,6 +1138,9 @@
                 this.clearError();
 
                 try {
+                    console.log(`🔄 Making request to: ${apiEndpoint}`);
+                    console.log(`🌍 Current environment: ${this.currentEnvironment.toUpperCase()}`);
+                    
                     const response = await fetch(apiEndpoint, {
                         method: 'POST',
                         headers: {
@@ -896,17 +1149,69 @@
                         body: JSON.stringify({ url })
                     });
 
+                    // Debug the response structure step by step
+                    console.log('🔍 1. RESPONSE OBJECT:', response);
+                    console.log('🔍 2. RESPONSE STATUS:', response.status);
+                    console.log('🔍 3. RESPONSE OK:', response.ok);
+
                     if (!response.ok) {
                         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                     }
 
-                    this.data = await response.json();
+                    // Get the actual response data
+                    const responseData = await response.json();
+                    
+                    // Debug the actual data
+                    console.log('🔍 4. RESPONSE DATA TYPE:', typeof responseData);
+                    console.log('🔍 5. RESPONSE DATA KEYS:', Object.keys(responseData || {}));
+                    console.log('🔍 6. RAW API RESPONSE:', JSON.stringify(responseData, null, 2));
+
+                    // Check specific parts
+                    if (responseData) {
+                        console.log('🔍 7. DETAILED RESULTS KEYS:', Object.keys(responseData.detailedResults || {}));
+                        console.log('🔍 8. STATS:', responseData.stats);
+                        
+                        // Look for the tour specifically
+                        if (responseData.detailedResults) {
+                            Object.keys(responseData.detailedResults).forEach(category => {
+                                const links = responseData.detailedResults[category];
+                                if (Array.isArray(links)) {
+                                    const classicPeru = links.find(link => 
+                                        link.text && link.text.toLowerCase().includes('classic peru')
+                                    );
+                                    if (classicPeru) {
+                                        console.log('🎯 FOUND CLASSIC PERU TOUR:', JSON.stringify(classicPeru, null, 2));
+                                    }
+                                }
+                            });
+                        }
+                    }
+
+                    this.data = responseData;  // Changed from response.data to responseData
                     this.showResults();
                     this.showSuccess('Analysis completed successfully!');
 
                 } catch (error) {
-                    console.error('API Error:', error);
-                    this.showError(`Failed to analyze URL: ${error.message}`);
+                    console.error('❌ API ERROR:', error);
+                    console.log('🔍 ERROR DETAILS:', {
+                        message: error.message,
+                        stack: error.stack
+                    });
+                    
+                    // Enhanced error message with environment context
+                    let errorMessage = `Analysis failed: ${error.message}`;
+                    if (error.message.includes('Failed to fetch') || error.message.includes('Network')) {
+                        errorMessage += `\n\n🌍 Current environment: ${this.currentEnvironment.toUpperCase()}`;
+                        errorMessage += `\n🔗 Endpoint: ${apiEndpoint}`;
+                        
+                        if (this.currentEnvironment === 'dev') {
+                            errorMessage += '\n\n💡 Tip: Make sure your local development server is running on port 3000';
+                        } else {
+                            errorMessage += '\n\n💡 Tip: Check if the production API server is accessible';
+                        }
+                    }
+                    
+                    this.showError(errorMessage);
                 } finally {
                     this.showLoading(false);
                 }
@@ -932,104 +1237,205 @@
                     { label: 'Categories', value: Object.keys(stats.categoryCounts).length, color: '#FF9800' },
                 ];
 
-                // Calculate total available/unavailable across all categories
+                // Calculate total available/unavailable/valid/invalid across ALL categories
                 let totalAvailable = 0;
                 let totalUnavailable = 0;
                 let totalValid = 0;
                 let totalInvalid = 0;
-                let totalWrongPaths = 0;
+                let totalRedirected = 0;
+                let totalValidationErrors = 0;
+                let totalAvailabilityErrors = 0;
 
+                // 1. Cruise Availability
                 if (stats.cruiseAvailability) {
                     totalAvailable += stats.cruiseAvailability.available || 0;
                     totalUnavailable += stats.cruiseAvailability.unavailable || 0;
+                    totalValidationErrors += stats.cruiseAvailability.errors || 0;
                 }
 
+                // 2. Tour With ID Validation (MISSING FROM ORIGINAL)
+                if (stats.tourWithIdValidation) {
+                    totalAvailable += stats.tourWithIdValidation.available || 0;
+                    totalUnavailable += stats.tourWithIdValidation.unavailable || 0;
+                    totalValid += stats.tourWithIdValidation.valid || 0;
+                    totalInvalid += stats.tourWithIdValidation.invalid || 0;
+                    totalRedirected += stats.tourWithIdValidation.redirected || 0;
+                    totalValidationErrors += stats.tourWithIdValidation.validationErrors || 0;
+                    totalAvailabilityErrors += stats.tourWithIdValidation.availabilityErrors || 0;
+                }
+
+                // 3. Tour Activity Validation
                 if (stats.tourActivityValidation) {
                     totalAvailable += stats.tourActivityValidation.available || 0;
                     totalUnavailable += stats.tourActivityValidation.unavailable || 0;
                     totalValid += stats.tourActivityValidation.valid || 0;
                     totalInvalid += stats.tourActivityValidation.invalid || 0;
+                    totalRedirected += stats.tourActivityValidation.redirected || 0;
+                    totalValidationErrors += stats.tourActivityValidation.validationErrors || 0;
+                    totalAvailabilityErrors += stats.tourActivityValidation.availabilityErrors || 0;
                 }
 
+                // 4. Cruise Ship Validation
                 if (stats.cruiseShipValidation) {
                     totalAvailable += stats.cruiseShipValidation.available || 0;
                     totalUnavailable += stats.cruiseShipValidation.unavailable || 0;
                     totalValid += stats.cruiseShipValidation.valid || 0;
                     totalInvalid += stats.cruiseShipValidation.invalid || 0;
+                    totalRedirected += stats.cruiseShipValidation.redirected || 0;
+                    totalValidationErrors += stats.cruiseShipValidation.validationErrors || 0;
+                    totalAvailabilityErrors += stats.cruiseShipValidation.availabilityErrors || 0;
                 }
 
+                // 5. Destination Validation
                 if (stats.destinationValidation) {
                     totalValid += stats.destinationValidation.valid || 0;
                     totalInvalid += stats.destinationValidation.invalid || 0;
+                    totalRedirected += stats.destinationValidation.redirected || 0;
+                    totalValidationErrors += stats.destinationValidation.errors || 0;
                 }
 
+                // 6. Destination Special Page Validation (MISSING FROM ORIGINAL)
+                if (stats.destinationSpecialPageValidation) {
+                    totalValid += stats.destinationSpecialPageValidation.valid || 0;
+                    totalInvalid += stats.destinationSpecialPageValidation.invalid || 0;
+                    totalRedirected += stats.destinationSpecialPageValidation.redirected || 0;
+                    totalValidationErrors += stats.destinationSpecialPageValidation.validationErrors || 0;
+                }
+
+                // 7. Story Validation
                 if (stats.storyValidation) {
                     totalAvailable += stats.storyValidation.available || 0;
                     totalUnavailable += stats.storyValidation.unavailable || 0;
                     totalValid += stats.storyValidation.valid || 0;
                     totalInvalid += stats.storyValidation.invalid || 0;
+                    totalRedirected += stats.storyValidation.redirected || 0;
+                    totalValidationErrors += stats.storyValidation.validationErrors || 0;
+                    totalAvailabilityErrors += stats.storyValidation.availabilityErrors || 0;
                 }
 
+                // 8. Contact Page Validation
                 if (stats.contactPageValidation) {
                     totalAvailable += stats.contactPageValidation.available || 0;
                     totalUnavailable += stats.contactPageValidation.unavailable || 0;
                     totalValid += stats.contactPageValidation.valid || 0;
                     totalInvalid += stats.contactPageValidation.invalid || 0;
+                    totalRedirected += stats.contactPageValidation.redirected || 0;
+                    totalValidationErrors += stats.contactPageValidation.validationErrors || 0;
+                    totalAvailabilityErrors += stats.contactPageValidation.availabilityErrors || 0;
                 }
 
+                // 9. Wrong Contact Path Validation
+                if (stats.wrongContactPathValidation) {
+                    // Wrong paths are always considered invalid
+                    totalInvalid += stats.wrongContactPathValidation.total || 0;
+                    totalValidationErrors += stats.wrongContactPathValidation.validationErrors || 0;
+                }
+
+                // 10. External Link Validation
                 if (stats.externalLinkValidation) {
                     totalAvailable += stats.externalLinkValidation.available || 0;
                     totalUnavailable += stats.externalLinkValidation.unavailable || 0;
                     totalValid += stats.externalLinkValidation.valid || 0;
                     totalInvalid += stats.externalLinkValidation.invalid || 0;
+                    totalRedirected += stats.externalLinkValidation.redirected || 0;
+                    totalValidationErrors += stats.externalLinkValidation.validationErrors || 0;
+                    totalAvailabilityErrors += stats.externalLinkValidation.availabilityErrors || 0;
                 }
 
-                if (stats.wrongContactPathValidation) {
-                    totalWrongPaths = stats.wrongContactPathValidation.total || 0;
-                    totalInvalid += totalWrongPaths; // Wrong paths are invalid
-                }
-
-                // Add availability summary
+                // Add comprehensive summary stats
                 if (totalAvailable > 0 || totalUnavailable > 0) {
                     summaryStats.push(
-                        { label: 'Available Links', value: totalAvailable, color: '#4CAF50' },
-                        { label: 'Unavailable Links', value: totalUnavailable, color: '#f44336' }
+                        { label: 'Available Content', value: totalAvailable, color: '#4CAF50' },
+                        { label: 'Unavailable Content', value: totalUnavailable, color: '#f44336' }
                     );
                 }
 
-                // Add validation summary
                 if (totalValid > 0 || totalInvalid > 0) {
                     summaryStats.push(
-                        { label: 'Valid Links', value: totalValid, color: '#4CAF50' },
-                        { label: 'Invalid Links', value: totalInvalid, color: '#f44336' }
+                        { label: 'Working Pages', value: totalValid, color: '#4CAF50' },
+                        { label: 'Broken Pages', value: totalInvalid, color: '#f44336' }
                     );
                 }
 
-                // Add wrong paths if any
-                if (totalWrongPaths > 0) {
+                if (totalRedirected > 0) {
                     summaryStats.push(
-                        { label: 'Wrong Paths', value: totalWrongPaths, color: '#9C27B0' }
+                        { label: 'Redirected Pages', value: totalRedirected, color: '#FF9800' }
                     );
                 }
 
-                // Add specific category stats if available
+                // Add error summary if there are errors
+                const totalErrorsFound = totalValidationErrors + totalAvailabilityErrors;
+                if (totalErrorsFound > 0) {
+                    summaryStats.push(
+                        { label: 'Total Errors Found', value: totalErrorsFound, color: '#9C27B0' }
+                    );
+                }
+
+                // Add specific category breakdown
+                const categoryBreakdown = [];
+
                 if (stats.cruiseAvailability && stats.cruiseAvailability.total > 0) {
-                    summaryStats.push(
-                        { label: 'Total Cruises', value: stats.cruiseAvailability.total, color: '#00BCD4' }
+                    categoryBreakdown.push(
+                        { label: 'Cruise Availability', value: stats.cruiseAvailability.total, color: '#00BCD4' }
+                    );
+                }
+
+                if (stats.tourWithIdValidation && stats.tourWithIdValidation.total > 0) {
+                    categoryBreakdown.push(
+                        { label: 'Tours with ID', value: stats.tourWithIdValidation.total, color: '#673AB7' }
+                    );
+                }
+
+                if (stats.tourActivityValidation && stats.tourActivityValidation.total > 0) {
+                    categoryBreakdown.push(
+                        { label: 'Tour Activities', value: stats.tourActivityValidation.total, color: '#009688' }
                     );
                 }
 
                 if (stats.cruiseShipValidation && stats.cruiseShipValidation.total > 0) {
-                    summaryStats.push(
+                    categoryBreakdown.push(
                         { label: 'Cruise Ships', value: stats.cruiseShipValidation.total, color: '#3F51B5' }
                     );
                 }
 
+                if (stats.destinationValidation && stats.destinationValidation.total > 0) {
+                    categoryBreakdown.push(
+                        { label: 'Destinations', value: stats.destinationValidation.total, color: '#8BC34A' }
+                    );
+                }
+
+                if (stats.destinationSpecialPageValidation && stats.destinationSpecialPageValidation.total > 0) {
+                    categoryBreakdown.push(
+                        { label: 'Special Pages', value: stats.destinationSpecialPageValidation.total, color: '#CDDC39' }
+                    );
+                }
+
+                if (stats.storyValidation && stats.storyValidation.total > 0) {
+                    categoryBreakdown.push(
+                        { label: 'Stories/Articles', value: stats.storyValidation.total, color: '#FF5722' }
+                    );
+                }
+
+                if (stats.contactPageValidation && stats.contactPageValidation.total > 0) {
+                    categoryBreakdown.push(
+                        { label: 'Contact Pages', value: stats.contactPageValidation.total, color: '#607D8B' }
+                    );
+                }
+
+                if (stats.wrongContactPathValidation && stats.wrongContactPathValidation.total > 0) {
+                    categoryBreakdown.push(
+                        { label: 'Wrong Contact Paths', value: stats.wrongContactPathValidation.total, color: '#E91E63' }
+                    );
+                }
+
                 if (stats.externalLinkValidation && stats.externalLinkValidation.total > 0) {
-                    summaryStats.push(
+                    categoryBreakdown.push(
                         { label: 'External Links', value: stats.externalLinkValidation.total, color: '#795548' }
                     );
                 }
+
+                // Add category breakdown to summary
+                summaryStats.push(...categoryBreakdown);
 
                 statsGrid.innerHTML = summaryStats.map(stat => `
                     <div class="stat-card">
@@ -1039,6 +1445,7 @@
                 `).join('');
             }
 
+            // Enhanced renderInsights() function with copyable report format
             renderInsights() {
                 const stats = this.data.stats;
                 const detailedResults = this.data.detailedResults;
@@ -1052,28 +1459,35 @@
                     wrongPaths: [],
                     redirected: [],
                     errors: [],
-                    lackingVariation: []
+                    lackingVariation: [],
+                    // Specific unavailable content categories
+                    toursNoPrice: [],           
+                    cruisesNoPrice: [],         
+                    cruiseShipsNotAvailable: [], 
+                    tourActivitiesNotAvailable: []
                 };
 
                 // Check for sections with excessive duplicate titles
                 if (detailedResults && detailedResults.sectionBreakdown) {
-                    detailedResults.sectionBreakdown.forEach(section => {
+                    detailedResults.sectionBreakdown.forEach(function(section) {
                         if (section.titleGroups && section.titleGroups.length > 0) {
                             const titleCounts = {};
-                            section.titleGroups.forEach(titleGroup => {
+                            section.titleGroups.forEach(function(titleGroup) {
                                 const title = titleGroup.title;
                                 titleCounts[title] = (titleCounts[title] || 0) + 1;
                             });
 
-                            const excessiveDuplicates = Object.keys(titleCounts).filter(title => titleCounts[title] > 3);
+                            const excessiveDuplicates = Object.keys(titleCounts).filter(function(title) {
+                                return titleCounts[title] > 3;
+                            });
                             
                             if (excessiveDuplicates.length > 0) {
-                                excessiveDuplicates.forEach(title => {
+                                excessiveDuplicates.forEach(function(title) {
                                     problemLinks.lackingVariation.push({
                                         section: section.section,
                                         title: title,
                                         count: titleCounts[title],
-                                        reason: `Section content lacks variety - same title appears ${titleCounts[title]} times`
+                                        reason: 'Section content lacks variety - same title appears ' + titleCounts[title] + ' times'
                                     });
                                 });
                             }
@@ -1081,273 +1495,623 @@
                     });
                 }
 
-                // Process all categories for detailed error collection with user-friendly messages
-                // Use a Set to track processed links and avoid duplicates
-                const processedLinks = new Set();
-                
-                Object.keys(detailedResults).forEach(category => {
-                    if (category === 'sectionBreakdown') return;
-                    
-                    const links = detailedResults[category] || [];
-                    
-                    links.forEach(link => {
-                        const linkKey = `${link.href}-${link.text}`;
+                // Process all categories for detailed error collection
+                if (detailedResults) {
+                    Object.keys(detailedResults).forEach(function(category) {
+                        if (category === 'sectionBreakdown') return;
                         
-                        // Skip if already processed
-                        if (processedLinks.has(linkKey)) {
-                            return;
-                        }
+                        const links = detailedResults[category] || [];
                         
-                        const linkInfo = {
-                            text: link.text,
-                            href: link.href,
-                            category: category.replace('Links', ''),
-                            error: link.error || link.validationError || link.availabilityError
-                        };
+                        links.forEach(function(link) {
+                            const linkInfo = {
+                                text: link.text,
+                                href: link.href,
+                                category: category,
+                                error: link.error || link.validationError || link.availabilityError,
+                                urlPattern: link.urlPattern
+                            };
 
-                        // PRIORITY 1: Wrong contact paths (highest priority)
-                        if (category === 'wrongContactPathLinks') {
-                            problemLinks.wrongPaths.push({
-                                ...linkInfo,
-                                reason: this.convertToUserFriendlyError('wrong path contactt', 'wrong-contact-path', destination, link.text)
-                            });
-                            processedLinks.add(linkKey);
-                            return;
-                        }
-
-                        // PRIORITY 2: Unavailable links (content not available)
-                        if (link.available === false) {
-                            const unavailableMsg = this.getUnavailableMessage(link.category, destination, link.text);
-                            let finalReason = unavailableMsg;
-                            
-                            // Add additional context if redirected or has errors
-                            const additionalInfo = [];
-                            if (link.redirected) {
-                                additionalInfo.push('page has moved');
-                            }
-                            if (linkInfo.error) {
-                                const userFriendlyError = this.convertToUserFriendlyError(linkInfo.error, link.category, destination, link.text);
-                                additionalInfo.push(userFriendlyError.toLowerCase());
-                            }
-                            
-                            if (additionalInfo.length > 0) {
-                                finalReason = `${unavailableMsg} (${additionalInfo.join(', ')})`;
-                            }
-                            
-                            problemLinks.unavailable.push({
-                                ...linkInfo,
-                                reason: finalReason,
-                                resolvedUrl: link.resolvedUrl,
-                                status: link.status
-                            });
-                            processedLinks.add(linkKey);
-                            return;
-                        }
-
-                        // PRIORITY 3: Invalid links (but only if not redirected)
-                        if (link.valid === false && !link.redirected) {
-                            const userFriendlyError = this.convertToUserFriendlyError(
-                                link.validationError || `HTTP ${link.status}` || 'validation failed', 
-                                link.category, 
-                                destination, 
-                                link.text
+                            // Helper to distinguish content errors from technical errors
+                            const isContentError = link.availabilityError && (
+                                link.availabilityError.toLowerCase().indexOf('pricing') !== -1 ||
+                                link.availabilityError.toLowerCase().indexOf('price') !== -1 ||
+                                link.availabilityError.toLowerCase().indexOf('not found') !== -1 ||
+                                link.availabilityError.toLowerCase().indexOf('not available') !== -1
                             );
-                            
-                            problemLinks.invalid.push({
-                                ...linkInfo,
-                                status: link.status,
-                                reason: userFriendlyError
-                            });
-                            processedLinks.add(linkKey);
-                            return;
-                        }
 
-                        // PRIORITY 4: Redirected links (only if valid but redirected)
-                        if (link.redirected === true) {
-                            let reason = 'Page has moved to a different location';
-                            
-                            // Add validation context if invalid
-                            if (link.valid === false) {
-                                const validationError = this.convertToUserFriendlyError(
-                                    link.validationError || `HTTP ${link.status}` || 'validation failed', 
-                                    link.category, 
-                                    destination, 
-                                    link.text
-                                );
-                                reason = `Page has moved and has issues (${validationError.toLowerCase()})`;
+                            // Classification logic (same as before)
+                            if (category === 'wrongContactPathLinks' || category === 'wrong-contact-path') {
+                                problemLinks.wrongPaths.push({
+                                    ...linkInfo,
+                                    reason: 'Wrong contact page path (likely should be /contact instead)'
+                                });
                             }
-                            
-                            problemLinks.redirected.push({
-                                ...linkInfo,
-                                resolvedUrl: link.resolvedUrl,
-                                status: link.status,
-                                reason: reason
-                            });
-                            processedLinks.add(linkKey);
-                            return;
-                        }
-
-                        // PRIORITY 5: General errors (only if not covered by above categories)
-                        if (linkInfo.error && linkInfo.error !== '-' && 
-                            link.available !== false && 
-                            link.valid !== false && 
-                            !link.redirected) {
-                            const userFriendlyError = this.convertToUserFriendlyError(linkInfo.error, link.category, destination, link.text);
-                            problemLinks.errors.push({
-                                ...linkInfo,
-                                reason: userFriendlyError
-                            });
-                            processedLinks.add(linkKey);
-                            return;
-                        }
+                            else if (link.available === false && link.valid !== false && (!link.availabilityError || isContentError)) {
+                                if (link.urlPattern === 'tour-with-id' || category === 'tourWithIdLinks') {
+                                    problemLinks.toursNoPrice.push({
+                                        ...linkInfo,
+                                        reason: 'Tour has no price content or price is $0',
+                                        tourId: link.tourId || 'Unknown',
+                                        priceText: link.priceText || 'Not found',
+                                        price: link.price || null
+                                    });
+                                }
+                                else if (link.urlPattern === 'cruise-with-id' || category === 'cruiseLinks') {
+                                    problemLinks.cruisesNoPrice.push({
+                                        ...linkInfo,
+                                        reason: 'Cruise has no price content or price is $0',
+                                        cruiseId: link.cruiseId || 'Unknown',
+                                        priceText: link.priceText || 'Not found',
+                                        price: link.price || null
+                                    });
+                                }
+                                else if (link.urlPattern === 'cruise-ship' || category === 'cruiseShipLinks') {
+                                    problemLinks.cruiseShipsNotAvailable.push({
+                                        ...linkInfo,
+                                        reason: 'Cruise ship not found in destination ship list',
+                                        shipName: link.shipName || 'Unknown',
+                                        shipOptions: link.shipOptions || [],
+                                        toursUrl: link.toursUrl || 'Unknown'
+                                    });
+                                }
+                                else if (link.urlPattern === 'tour-activity' || category === 'tourActivityLinks') {
+                                    problemLinks.tourActivitiesNotAvailable.push({
+                                        ...linkInfo,
+                                        reason: 'Tour activity not found in experience or activity option lists',
+                                        activityText: link.activityText || 'Unknown',
+                                        experienceOptions: link.experienceOptions || [],
+                                        activityOptions: link.activityOptions || []
+                                    });
+                                }
+                                else {
+                                    problemLinks.unavailable.push({
+                                        ...linkInfo,
+                                        reason: 'Content unavailable or not found on page'
+                                    });
+                                }
+                            }
+                            else if (link.valid === false || link.validationError || (link.availabilityError && !isContentError)) {
+                                problemLinks.invalid.push({
+                                    ...linkInfo,
+                                    reason: (link.availabilityError && !isContentError) ? link.availabilityError : (link.validationError || 'Page validation failed')
+                                });
+                            }
+                            else if (link.redirected === true) {
+                                problemLinks.redirected.push({
+                                    ...linkInfo,
+                                    reason: 'Page redirects to different URL'
+                                });
+                            }
+                            else if (link.error) {
+                                problemLinks.errors.push({
+                                    ...linkInfo,
+                                    reason: link.error
+                                });
+                            }
+                        });
                     });
-                });
+                }
 
-                // Create detailed insights with updated titles
+                // Build insights array
                 if (problemLinks.wrongPaths.length > 0) {
                     insights.push({
                         type: 'error',
-                        title: `🚨 Website Address Errors (${problemLinks.wrongPaths.length})`,
+                        title: 'Wrong Contact Paths',
+                        count: problemLinks.wrongPaths.length,
                         items: problemLinks.wrongPaths,
-                        priority: 'high'
+                        priority: 'high',
+                        icon: '🚨'
+                    });
+                }
+
+                if (problemLinks.toursNoPrice.length > 0) {
+                    insights.push({
+                        type: 'warning',
+                        title: 'Tours with No Price Content',
+                        count: problemLinks.toursNoPrice.length,
+                        items: problemLinks.toursNoPrice,
+                        priority: 'high',
+                        icon: '🎯'
+                    });
+                }
+
+                if (problemLinks.cruisesNoPrice.length > 0) {
+                    insights.push({
+                        type: 'warning', 
+                        title: 'Cruises with No Price Content',
+                        count: problemLinks.cruisesNoPrice.length,
+                        items: problemLinks.cruisesNoPrice,
+                        priority: 'high',
+                        icon: '🛳️'
+                    });
+                }
+
+                if (problemLinks.cruiseShipsNotAvailable.length > 0) {
+                    insights.push({
+                        type: 'warning',
+                        title: 'Cruise Ships Not Available',
+                        count: problemLinks.cruiseShipsNotAvailable.length,
+                        items: problemLinks.cruiseShipsNotAvailable,
+                        priority: 'high',
+                        icon: '🚢'
+                    });
+                }
+
+                if (problemLinks.tourActivitiesNotAvailable.length > 0) {
+                    insights.push({
+                        type: 'warning',
+                        title: 'Tour Activities Not Available',
+                        count: problemLinks.tourActivitiesNotAvailable.length,
+                        items: problemLinks.tourActivitiesNotAvailable,
+                        priority: 'high',
+                        icon: '🎪'
                     });
                 }
 
                 if (problemLinks.unavailable.length > 0) {
                     insights.push({
                         type: 'warning',
-                        title: `❌ Content No Longer Available (${problemLinks.unavailable.length})`,
+                        title: 'Other Unavailable Content',
+                        count: problemLinks.unavailable.length,
                         items: problemLinks.unavailable,
-                        priority: 'high'
+                        priority: 'medium',
+                        icon: '❌'
                     });
                 }
 
                 if (problemLinks.invalid.length > 0) {
                     insights.push({
                         type: 'warning',
-                        title: `🔗 Broken Pages (${problemLinks.invalid.length})`,
+                        title: 'Broken Pages',
+                        count: problemLinks.invalid.length,
                         items: problemLinks.invalid,
-                        priority: 'medium'
+                        priority: 'medium',
+                        icon: '🔗'
                     });
                 }
 
                 if (problemLinks.redirected.length > 0) {
                     insights.push({
                         type: 'info',
-                        title: `↗️ Pages That Have Moved (${problemLinks.redirected.length})`,
+                        title: 'Pages That Have Moved',
+                        count: problemLinks.redirected.length,
                         items: problemLinks.redirected,
-                        priority: 'low'
+                        priority: 'low',
+                        icon: '↗️'
                     });
                 }
 
                 if (problemLinks.lackingVariation.length > 0) {
                     insights.push({
                         type: 'info',
-                        title: `📝 Content Variety Issues (${problemLinks.lackingVariation.length} issues)`,
+                        title: 'Content Variety Issues',
+                        count: problemLinks.lackingVariation.length,
                         items: problemLinks.lackingVariation,
-                        priority: 'medium'
+                        priority: 'medium',
+                        icon: '📝'
                     });
                 }
 
                 if (problemLinks.errors.length > 0) {
                     insights.push({
                         type: 'error',
-                        title: `⚠️ Other Issues (${problemLinks.errors.length})`,
+                        title: 'Other Issues',
+                        count: problemLinks.errors.length,
                         items: problemLinks.errors,
-                        priority: 'medium'
+                        priority: 'medium',
+                        icon: '⚠️'
                     });
                 }
+
+                // Generate copyable report
+                const reportText = this.generateCopyableReport(destination, insights, stats);
 
                 // Display insights
                 const insightsPanel = document.getElementById('insightsPanel');
                 const insightsContent = document.getElementById('insightsContent');
 
                 if (insights.length > 0) {
-                    insights.sort((a, b) => {
+                    insights.sort(function(a, b) {
                         const priorityOrder = { 'high': 0, 'medium': 1, 'low': 2 };
                         return priorityOrder[a.priority] - priorityOrder[b.priority];
                     });
 
-                    const totalIssues = insights.reduce((sum, insight) => sum + insight.items.length, 0);
+                    const totalIssues = insights.reduce(function(sum, insight) {
+                        return sum + insight.count;
+                    }, 0);
 
-                    const summaryHtml = `
-                        <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; text-align: center;">
-                            <h4 style="margin: 0 0 0.5rem 0; color: #856404;">
-                                📊 Total Issues Found: <span style="color: #d32f2f; font-size: 1.2em;">${totalIssues}</span>
-                            </h4>
-                            <p style="margin: 0; color: #856404; font-size: 14px;">
-                                Issues are sorted by priority: 🚨 High → ⚠️ Medium → ℹ️ Low
-                            </p>
-                        </div>
-                    `;
+                    const headerHtml = 
+                        '<div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; position: relative;">' +
+                            '<div style="display: flex; justify-content: space-between; align-items: center;">' +
+                                '<div>' +
+                                    '<h4 style="margin: 0 0 0.5rem 0; color: #856404;">' +
+                                        '📊 Total Issues Found: <span style="color: #d32f2f; font-size: 1.2em;">' + totalIssues + '</span>' +
+                                    '</h4>' +
+                                    '<p style="margin: 0; color: #856404; font-size: 14px;">' +
+                                        'Comprehensive report ready for documentation' +
+                                    '</p>' +
+                                '</div>' +
+                                '<div>' +
+                                    '<button id="copyReportBtn" style="background: #2196F3; color: white; border: none; padding: 0.75rem 1rem; border-radius: 6px; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 0.5rem;">' +
+                                        '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">' +
+                                            '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>' +
+                                        '</svg>' +
+                                        'Copy Report' +
+                                    '</button>' +
+                                '</div>' +
+                            '</div>' +
+                        '</div>';
 
-                    insightsContent.innerHTML = summaryHtml + insights.map(insight => {
+                    insightsContent.innerHTML = headerHtml + insights.map(function(insight) {
                         const color = insight.type === 'error' ? '#f44336' : 
                                      insight.type === 'warning' ? '#FF9800' : '#2196F3';
                         const bgColor = insight.type === 'error' ? '#ffebee' : 
                                        insight.type === 'warning' ? '#fff3e0' : '#e3f2fd';
                         const textColor = insight.type === 'error' ? '#c62828' : 
-                                         insight.type === 'warning' ? '#ef6c00' : '#1565c0';
+                                         insight.type === 'warning' ? '#ef6c00' : '#1976d2';
 
-                        let itemsList = '';
-                        
-                        if (insight.title.includes('Content Variety')) {
-                            itemsList = insight.items.map(item => `
-                                <div class="insight-link-item" style="border-left-color: ${color};">
-                                    <div class="link-text">
-                                        ${item.section} Section
-                                        <span class="category-tag">Content Structure</span>
-                                    </div>
-                                    <div class="link-url">
-                                        Title: "<strong>${item.title}</strong>" (appears ${item.count} times)
-                                    </div>
-                                    <div class="link-error">
-                                        ${item.reason}
-                                    </div>
-                                </div>
-                            `).join('');
-                        } else {
-                            itemsList = insight.items.map(item => `
-                                <div class="insight-link-item" style="border-left-color: ${color};">
-                                    <div class="link-text">
-                                        ${this.escapeHtml(item.text)}
-                                        <span class="category-tag">${item.category}</span>
-                                    </div>
-                                    <div class="link-url">
-                                        <a href="${item.href}" target="_blank" style="color: #1976d2; text-decoration: none;">${item.href}</a>
-                                    </div>
-                                    <div class="link-error">
-                                        ${item.reason}
-                                        ${item.resolvedUrl ? `<br><strong>Page moved to:</strong> <a href="${item.resolvedUrl}" target="_blank" style="color: #1976d2;">${item.resolvedUrl}</a>` : ''}
-                                        ${item.status ? `<br><strong>Status:</strong> ${item.status}` : ''}
-                                    </div>
-                                </div>
-                            `).join('');
-                        }
-
-                        return `
-                            <div class="insight-item" style="border: 1px solid ${color};">
-                                <div class="insight-header" style="background: ${bgColor}; border-bottom-color: ${color};">
-                                    <h4 style="margin: 0; color: ${textColor};">${insight.title}</h4>
-                                </div>
-                                <div class="insight-content">
-                                    ${itemsList}
-                                </div>
-                            </div>
-                        `;
+                        return (
+                            '<div style="margin-bottom: 1.5rem; border: 2px solid ' + color + '; border-radius: 8px; overflow: hidden;">' +
+                                '<div style="background: ' + color + '; color: white; padding: 0.75rem; font-weight: bold;">' +
+                                    insight.icon + ' ' + insight.title + ' (' + insight.count + ')' +
+                                    '<span style="float: right; background: rgba(255,255,255,0.2); padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.85em;">' +
+                                        'Priority: ' + insight.priority.toUpperCase() +
+                                    '</span>' +
+                                '</div>' +
+                                '<div style="background: ' + bgColor + '; padding: 1rem; max-height: 300px; overflow-y: auto;">' +
+                                    insight.items.map(function(item, index) {
+                                        return (
+                                            '<div style="margin-bottom: 1rem; padding: 0.75rem; background: white; border-radius: 6px; border-left: 4px solid ' + color + ';">' +
+                                                '<div style="font-weight: bold; color: ' + textColor + '; margin-bottom: 0.5rem;">' +
+                                                    (index + 1) + '. ' + (item.text || 'No title') +
+                                                '</div>' +
+                                                '<div style="font-family: monospace; font-size: 0.85em; color: #666; margin-bottom: 0.5rem; word-break: break-all;">' +
+                                                    '🔗 ' + item.href +
+                                                '</div>' +
+                                                '<div style="color: ' + textColor + '; font-size: 0.9em; margin-bottom: 0.5rem;">' +
+                                                    '<strong>Issue:</strong> ' + item.reason +
+                                                '</div>' +
+                                                (item.tourId ? '<div style="font-size: 0.85em; color: #666;"><strong>Tour ID:</strong> ' + item.tourId + ' | <strong>Price Found:</strong> ' + item.priceText + '</div>' : '') +
+                                                (item.cruiseId ? '<div style="font-size: 0.85em; color: #666;"><strong>Cruise ID:</strong> ' + item.cruiseId + ' | <strong>Price Found:</strong> ' + item.priceText + '</div>' : '') +
+                                                (item.shipName ? '<div style="font-size: 0.85em; color: #666;"><strong>Ship Name:</strong> ' + item.shipName + ' | <strong>Available Ships:</strong> ' + item.shipOptions.length + '</div>' : '') +
+                                                (item.activityText ? '<div style="font-size: 0.85em; color: #666;"><strong>Activity:</strong> ' + item.activityText + ' | <strong>Options Found:</strong> ' + (item.experienceOptions.length + item.activityOptions.length) + '</div>' : '') +
+                                            '</div>'
+                                        );
+                                    }).join('') +
+                                '</div>' +
+                            '</div>'
+                        );
                     }).join('');
                     
                     insightsPanel.style.display = 'block';
+
+                    // Add copy functionality - VERSION 2 with HTML and Plain Text
+                    const copyBtn = document.getElementById('copyReportBtn');
+                    const self = this; // Store reference for use in callback
+                    if (copyBtn) {
+                        copyBtn.addEventListener('click', function() {
+                            // Generate both formats
+                            const textReport = reportText;
+                            const htmlReport = self.generateCopyableReportHTML(destination, insights, stats);
+                            
+                            // Try modern clipboard API first (with HTML support)
+                            if (navigator.clipboard && navigator.clipboard.write) {
+                                const clipboardItems = [
+                                    new ClipboardItem({
+                                        'text/html': new Blob([htmlReport], { type: 'text/html' }),
+                                        'text/plain': new Blob([textReport], { type: 'text/plain' })
+                                    })
+                                ];
+                                
+                                navigator.clipboard.write(clipboardItems).then(function() {
+                                    // Show success feedback
+                                    const originalText = copyBtn.innerHTML;
+                                    copyBtn.innerHTML = 
+                                        '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">' +
+                                            '<path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>' +
+                                        '</svg>' +
+                                        'Copied! (HTML + Text)';
+                                    copyBtn.style.background = '#4CAF50';
+                                    
+                                    setTimeout(function() {
+                                        copyBtn.innerHTML = originalText;
+                                        copyBtn.style.background = '#2196F3';
+                                    }, 3000);
+                                }).catch(function(err) {
+                                    console.warn('Modern clipboard API failed, falling back to text-only:', err);
+                                    fallbackToTextOnly();
+                                });
+                            } else {
+                                // Fallback for older browsers (text only)
+                                fallbackToTextOnly();
+                            }
+                            
+                            function fallbackToTextOnly() {
+                                if (navigator.clipboard && navigator.clipboard.writeText) {
+                                    navigator.clipboard.writeText(textReport).then(function() {
+                                        // Show fallback success feedback
+                                        const originalText = copyBtn.innerHTML;
+                                        copyBtn.innerHTML = 
+                                            '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">' +
+                                                '<path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>' +
+                                            '</svg>' +
+                                            'Copied! (Text)';
+                                        copyBtn.style.background = '#FF9800';
+                                        
+                                        setTimeout(function() {
+                                            copyBtn.innerHTML = originalText;
+                                            copyBtn.style.background = '#2196F3';
+                                        }, 3000);
+                                    }).catch(function(err) {
+                                        console.error('All clipboard methods failed:', err);
+                                        // Final fallback - show modal with text to copy manually
+                                        showManualCopyModal(textReport);
+                                    });
+                                } else {
+                                    // Final fallback for very old browsers
+                                    showManualCopyModal(textReport);
+                                }
+                            }
+                            
+                            function showManualCopyModal(text) {
+                                // Create modal for manual copy
+                                const modal = document.createElement('div');
+                                modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;';
+                                
+                                const modalContent = document.createElement('div');
+                                modalContent.style.cssText = 'background: white; padding: 20px; border-radius: 8px; max-width: 80%; max-height: 80%; overflow: hidden;';
+                                
+                                modalContent.innerHTML = 
+                                    '<h3 style="margin-top: 0;">Copy Report Manually</h3>' +
+                                    '<p>Please copy the report text below:</p>' +
+                                    '<textarea readonly style="width: 100%; height: 300px; font-family: monospace; font-size: 12px;">' + text + '</textarea>' +
+                                    '<div style="margin-top: 15px; text-align: right;">' +
+                                        '<button onclick="this.parentElement.parentElement.parentElement.remove()" style="padding: 8px 16px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">Close</button>' +
+                                    '</div>';
+                                
+                                modal.appendChild(modalContent);
+                                document.body.appendChild(modal);
+                                
+                                // Select the text automatically
+                                const textarea = modalContent.querySelector('textarea');
+                                textarea.focus();
+                                textarea.select();
+                                
+                                // Close modal when clicking outside
+                                modal.addEventListener('click', function(e) {
+                                    if (e.target === modal) {
+                                        modal.remove();
+                                    }
+                                });
+                            }
+                        });
+                    }
+                    
                 } else {
-                    insightsContent.innerHTML = `
-                        <div style="text-align: center; color: #4CAF50; padding: 2rem; background: #e8f5e9; border-radius: 8px;">
-                            <div style="font-size: 3rem; margin-bottom: 1rem;">✅</div>
-                            <h4 style="margin: 0 0 0.5rem 0; color: #2e7d32;">No Critical Issues Found!</h4>
-                            <p style="margin: 0; color: #388e3c;">All analyzed links appear to be working correctly. Great job!</p>
-                        </div>
-                    `;
+                    insightsContent.innerHTML = 
+                        '<div style="background: #e8f5e8; border: 2px solid #4CAF50; border-radius: 8px; padding: 2rem; text-align: center;">' +
+                            '<h3 style="color: #2e7d32; margin: 0 0 1rem 0;">🎉 Excellent! No Issues Found</h3>' +
+                            '<p style="color: #388e3c; margin: 0; font-size: 1.1em;">' +
+                                'All ' + (this.data.stats?.totalLinks || 0) + ' links are working correctly and have proper content!' +
+                            '</p>' +
+                        '</div>';
                     insightsPanel.style.display = 'block';
                 }
+            }
+
+            // NEW: Generate copyable report text - CLEAN DOCUMENT STYLE
+            generateCopyableReport(destination, insights, stats) {
+                const currentDate = new Date().toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                });
+                
+                const totalIssues = insights.reduce(function(sum, insight) {
+                    return sum + insight.count;
+                }, 0);
+
+                let report = '';
+                
+                // Document Header
+                report += 'LINK AUDIT REPORT\n\n';
+                
+                report += 'Destination: ' + destination + '\n';
+                report += 'Audit Date: ' + currentDate + '\n';
+                report += 'Audit URL: ' + this.auditUrl + '\n';
+                report += 'Total Links Analyzed: ' + (stats?.totalLinks || 0) + '\n';
+                report += 'Total Issues Found: ' + totalIssues + '\n\n\n';
+                
+                if (totalIssues === 0) {
+                    report += 'EXECUTIVE SUMMARY\n\n';
+                    report += 'Excellent! All ' + (stats?.totalLinks || 0) + ' links are working correctly and have proper content. No issues were found during this audit.\n\n';
+                    return report;
+                }
+                
+                // Executive Summary
+                report += 'EXECUTIVE SUMMARY\n\n';
+                
+                const highPriorityCount = insights.filter(i => i.priority === 'high').reduce((sum, i) => sum + i.count, 0);
+                const mediumPriorityCount = insights.filter(i => i.priority === 'medium').reduce((sum, i) => sum + i.count, 0);
+                const lowPriorityCount = insights.filter(i => i.priority === 'low').reduce((sum, i) => sum + i.count, 0);
+                
+                report += 'This audit identified ' + totalIssues + ' issues across ' + insights.length + ' categories.\n\n';
+                
+                // Priority Breakdown
+                report += 'Priority Breakdown:\n\n';
+                if (highPriorityCount > 0) {
+                    report += '• High Priority: ' + highPriorityCount + ' issue' + (highPriorityCount === 1 ? '' : 's') + ' (Immediate attention required)\n\n';
+                }
+                if (mediumPriorityCount > 0) {
+                    report += '• Medium Priority: ' + mediumPriorityCount + ' issue' + (mediumPriorityCount === 1 ? '' : 's') + ' (Address when convenient)\n\n';
+                }
+                if (lowPriorityCount > 0) {
+                    report += '• Low Priority: ' + lowPriorityCount + ' issue' + (lowPriorityCount === 1 ? '' : 's') + ' (Minor optimization)\n\n';
+                }
+                report += '\n';
+                
+                // Detailed Findings
+                report += 'DETAILED FINDINGS\n\n';
+                
+                insights.forEach(function(insight, insightIndex) {
+                    report += (insightIndex + 1) + '. ' + insight.title + '\n\n';
+                    report += 'Total Issues: ' + insight.count + '\n';
+                    report += 'Priority: ' + insight.priority.charAt(0).toUpperCase() + insight.priority.slice(1) + '\n\n';
+                    
+                    insight.items.forEach(function(item, itemIndex) {
+                        report += 'Issue ' + (itemIndex + 1) + ':\n';
+                        report += 'Title: ' + (item.text || 'No title') + '\n';
+                        report += 'URL: ' + item.href + '\n';
+                        report += 'Problem: ' + item.reason + '\n';
+                        
+                        // Add specific details based on type
+                        if (item.tourId) {
+                            report += 'Tour ID: ' + item.tourId + '\n';
+                            report += 'Price Status: ' + item.priceText + '\n';
+                        }
+                        if (item.cruiseId) {
+                            report += 'Cruise ID: ' + item.cruiseId + '\n';
+                            report += 'Price Status: ' + item.priceText + '\n';
+                        }
+                        if (item.shipName) {
+                            report += 'Ship Name: ' + item.shipName + '\n';
+                            report += 'Available Ships: ' + item.shipOptions.length + '\n';
+                        }
+                        if (item.activityText) {
+                            report += 'Activity: ' + item.activityText + '\n';
+                            report += 'Options Found: ' + (item.experienceOptions.length + item.activityOptions.length) + '\n';
+                        }
+                        
+                        report += 'Category: ' + item.category + '\n\n';
+                    });
+                });
+                
+                // Recommended Actions
+                report += 'RECOMMENDED ACTIONS\n\n';
+                
+                let actionCounter = 1;
+                
+                const highPriorityIssues = insights.filter(i => i.priority === 'high');
+                if (highPriorityIssues.length > 0) {
+                    report += 'Immediate Actions (High Priority):\n\n';
+                    highPriorityIssues.forEach(function(insight) {
+                        report += actionCounter + '. Fix ' + insight.title + '\n';
+                        report += '   • ' + insight.count + ' link' + (insight.count === 1 ? '' : 's') + ' need immediate attention\n';
+                        report += '   • Impact: High - affects user experience\n\n';
+                        actionCounter++;
+                    });
+                }
+                
+                const mediumPriorityIssues = insights.filter(i => i.priority === 'medium');
+                if (mediumPriorityIssues.length > 0) {
+                    report += 'Scheduled Actions (Medium Priority):\n\n';
+                    mediumPriorityIssues.forEach(function(insight) {
+                        report += actionCounter + '. Address ' + insight.title + '\n';
+                        report += '   • ' + insight.count + ' link' + (insight.count === 1 ? '' : 's') + ' to be fixed when convenient\n';
+                        report += '   • Impact: Medium - plan for next maintenance window\n\n';
+                        actionCounter++;
+                    });
+                }
+                
+                const lowPriorityIssues = insights.filter(i => i.priority === 'low');
+                if (lowPriorityIssues.length > 0) {
+                    report += 'Future Optimization (Low Priority):\n\n';
+                    lowPriorityIssues.forEach(function(insight) {
+                        report += actionCounter + '. Optimize ' + insight.title + '\n';
+                        report += '   • ' + insight.count + ' item' + (insight.count === 1 ? '' : 's') + ' for future improvement\n';
+                        report += '   • Impact: Low - enhancement opportunities\n\n';
+                        actionCounter++;
+                    });
+                }
+                
+                // Document Footer
+                report += 'Report generated on ' + currentDate + '\n';
+                report += 'Generated by: Link Audit Dashboard\n';
+                report += 'Contact: Web Development Team for questions';
+                
+                return report;
+            }
+
+            // NEW: Selective bold text, bigger headers, no category field
+            generateCopyableReportHTML(destination, insights, stats) {
+                const currentDate = new Date().toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                });
+                
+                const totalIssues = insights.reduce(function(sum, insight) {
+                    return sum + insight.count;
+                }, 0);
+
+                // Simple HTML with selective bold and bigger headers
+                let html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 40px 20px; color: #333;">';
+                
+                // Document Header - Bigger font, selective bold
+                html += '<h1 style="font-size: 2.8rem; font-weight: bold; margin-bottom: 30px; color: #2c3e50;">Link Audit Report</h1>';
+                
+                html += '<p style="margin: 8px 0;"><strong>Destination:</strong> ' + destination + '</p>';
+                html += '<p style="margin: 8px 0;"><strong>Audit Date:</strong> ' + currentDate + '</p>';
+                html += '<p style="margin: 8px 0;"><strong>Audit URL:</strong> <a href="' + this.auditUrl + '" style="color: #667eea; text-decoration: none;">' + this.auditUrl + '</a></p>';
+                html += '<p style="margin: 8px 0;"><strong>Total Links Analyzed:</strong> ' + (stats?.totalLinks || 0) + '</p>';
+                html += '<p style="margin: 8px 0;"><strong>Total Issues Found:</strong> ' + totalIssues + '</p>';
+                
+                if (totalIssues === 0) {
+                    html += '<p style="margin: 20px 0;">Excellent! All links are working correctly and have proper content. No issues were found during this audit.</p>';
+                    html += '<br>';
+                    html += '<p style="margin: 8px 0;">Report generated on ' + currentDate + '</p>';
+                    html += '<p style="margin: 8px 0;">Generated by: Link Audit Dashboard</p>';
+                    html += '<p style="margin: 8px 0;">Contact: Web Development Team for questions</p>';
+                    html += '</body></html>';
+                    return html;
+                }
+                
+                // Detailed Findings - Bigger header
+                html += '<h2 style="font-size: 2rem; font-weight: bold; margin: 40px 0 20px 0; color: #2c3e50;">Detailed Findings</h2>';
+                
+                insights.forEach(function(insight, insightIndex) {
+                    html += '<p style="margin: 20px 0 8px 0; font-size: 1.3rem;"><strong>' + (insightIndex + 1) + '. ' + insight.title + '</strong></p>';
+                    html += '<p style="margin: 8px 0 8px 0;">Total Issues: ' + insight.count + '</p>';
+                    html += '<p style="margin: 8px 0 20px 0;">Priority: ' + insight.priority.charAt(0).toUpperCase() + insight.priority.slice(1) + '</p>';
+                    
+                    insight.items.forEach(function(item, itemIndex) {
+                        html += '<div style="margin-left: 20px; margin-bottom: 20px;">';
+                        html += '<p style="margin: 8px 0;"><strong>Issue ' + (itemIndex + 1) + ': ' + (item.text || 'No title') + '</strong></p>';
+                        html += '<p style="margin: 8px 0; margin-left: 20px;"><a href="' + item.href + '" style="color: #667eea; text-decoration: none; word-break: break-all;">' + item.href + '</a></p>';
+                        html += '<p style="margin: 8px 0; margin-left: 20px;">Problem: ' + item.reason + '</p>';
+                        
+                        // Add specific details with indentation (NO CATEGORY)
+                        if (item.tourId) {
+                            html += '<p style="margin: 8px 0; margin-left: 20px;">Tour ID: ' + item.tourId + '</p>';
+                            html += '<p style="margin: 8px 0; margin-left: 20px;">Price Status: ' + item.priceText + '</p>';
+                        }
+                        if (item.cruiseId) {
+                            html += '<p style="margin: 8px 0; margin-left: 20px;">Cruise ID: ' + item.cruiseId + '</p>';
+                            html += '<p style="margin: 8px 0; margin-left: 20px;">Price Status: ' + item.priceText + '</p>';
+                        }
+                        if (item.shipName) {
+                            html += '<p style="margin: 8px 0; margin-left: 20px;">Ship Name: ' + item.shipName + '</p>';
+                            html += '<p style="margin: 8px 0; margin-left: 20px;">Available Ships: ' + item.shipOptions.length + '</p>';
+                        }
+                        if (item.activityText) {
+                            html += '<p style="margin: 8px 0; margin-left: 20px;">Activity: ' + item.activityText + '</p>';
+                            html += '<p style="margin: 8px 0; margin-left: 20px;">Options Found: ' + (item.experienceOptions.length + item.activityOptions.length) + '</p>';
+                        }
+                        // REMOVED: Category field is no longer included
+                        html += '</div>';
+                    });
+                });
+                
+                // Document Footer with spacing
+                html += '<div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd;">';
+                html += '<p style="margin: 8px 0;">Report generated on ' + currentDate + '</p>';
+                html += '<p style="margin: 8px 0;">Generated by: Link Audit Dashboard</p>';
+                html += '<p style="margin: 8px 0;">Contact: Web Development Team for questions</p>';
+                html += '</div>';
+                
+                html += '</body></html>';
+                
+                return html;
             }
 
             renderCharts() {
@@ -1404,10 +2168,16 @@
                     'Unknown': 0
                 };
 
-                // Aggregate availability data from all sources
+                // Aggregate availability data from ALL sources (including missing ones)
                 if (stats.cruiseAvailability) {
                     availabilityData.Available += stats.cruiseAvailability.available || 0;
                     availabilityData.Unavailable += stats.cruiseAvailability.unavailable || 0;
+                }
+
+                // ADDED: tourWithIdValidation (was missing)
+                if (stats.tourWithIdValidation) {
+                    availabilityData.Available += stats.tourWithIdValidation.available || 0;
+                    availabilityData.Unavailable += stats.tourWithIdValidation.unavailable || 0;
                 }
 
                 if (stats.tourActivityValidation) {
@@ -1435,6 +2205,7 @@
                     availabilityData.Unavailable += stats.externalLinkValidation.unavailable || 0;
                 }
 
+                // Wrong paths are always considered unavailable
                 if (stats.wrongContactPathValidation) {
                     availabilityData.Unavailable += stats.wrongContactPathValidation.total || 0;
                 }
@@ -1478,11 +2249,18 @@
                     'Redirected': 0
                 };
 
-                // Aggregate validation data from all sources
+                // Aggregate validation data from ALL sources (including missing ones)
                 if (stats.destinationValidation) {
                     validationData.Valid += stats.destinationValidation.valid || 0;
                     validationData.Invalid += stats.destinationValidation.invalid || 0;
                     validationData.Redirected += stats.destinationValidation.redirected || 0;
+                }
+
+                // ADDED: tourWithIdValidation (was missing)
+                if (stats.tourWithIdValidation) {
+                    validationData.Valid += stats.tourWithIdValidation.valid || 0;
+                    validationData.Invalid += stats.tourWithIdValidation.invalid || 0;
+                    validationData.Redirected += stats.tourWithIdValidation.redirected || 0;
                 }
 
                 if (stats.tourActivityValidation) {
@@ -1497,6 +2275,7 @@
                     validationData.Redirected += stats.cruiseShipValidation.redirected || 0;
                 }
 
+                // ADDED: destinationSpecialPageValidation (was missing)
                 if (stats.destinationSpecialPageValidation) {
                     validationData.Valid += stats.destinationSpecialPageValidation.valid || 0;
                     validationData.Invalid += stats.destinationSpecialPageValidation.invalid || 0;
@@ -1515,6 +2294,7 @@
                     validationData.Redirected += stats.contactPageValidation.redirected || 0;
                 }
 
+                // Wrong contact paths are always invalid
                 if (stats.wrongContactPathValidation) {
                     validationData.Invalid += stats.wrongContactPathValidation.total || 0;
                 }
